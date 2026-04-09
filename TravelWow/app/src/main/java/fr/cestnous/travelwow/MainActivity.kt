@@ -14,17 +14,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TravelWowTheme {
-                var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+                val auth = FirebaseAuth.getInstance()
+                // On utilise un état local pour suivre l'utilisateur
+                var currentUser by remember { mutableStateOf(auth.currentUser) }
 
                 if (currentUser == null) {
                     AuthScreen(onAuthSuccess = {
-                        currentUser = FirebaseAuth.getInstance().currentUser
+                        currentUser = auth.currentUser
                     })
                 } else {
-                    TravelWowApp(onLogout = {
-                        FirebaseAuth.getInstance().signOut()
-                        currentUser = null
-                    })
+                    // IMPORTANT : key(currentUser.uid) force la recréation de tout l'écran 
+                    // si l'utilisateur change, ce qui vide les anciens ViewModels et états.
+                    key(currentUser?.uid) {
+                        TravelWowApp(onLogout = {
+                            auth.signOut()
+                            currentUser = null
+                        })
+                    }
                 }
             }
         }
