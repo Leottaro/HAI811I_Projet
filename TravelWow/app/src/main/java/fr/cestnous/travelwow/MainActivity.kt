@@ -21,10 +21,13 @@ class MainActivity : ComponentActivity() {
                         currentUser = FirebaseAuth.getInstance().currentUser
                     })
                 } else {
-                    TravelWowApp(onLogout = {
-                        FirebaseAuth.getInstance().signOut()
-                        currentUser = null
-                    })
+                    TravelWowApp(
+                        user = currentUser!!,
+                        onLogout = {
+                            FirebaseAuth.getInstance().signOut()
+                            currentUser = null
+                        }
+                    )
                 }
             }
         }

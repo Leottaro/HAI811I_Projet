@@ -28,6 +28,8 @@ fun SearchTopBar(
     isAdding: Boolean = false,
     onShareClick: () -> Unit = {},
     canShare: Boolean = false,
+    viewMode: GalleryViewMode = GalleryViewMode.GRID,
+    onViewModeChange: (GalleryViewMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -69,12 +71,24 @@ fun SearchTopBar(
                         )
                     },
                     trailingIcon = {
-                        IconButton(onClick = { /* TODO */ }) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_filters),
-                                contentDescription = "Filtres",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = {
+                                val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                                onViewModeChange(newMode)
+                            }) {
+                                Icon(
+                                    painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
+                                    contentDescription = "Changer de vue",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { /* TODO */ }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_filters),
+                                    contentDescription = "Filtres",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     },
                     singleLine = true,
@@ -119,35 +133,15 @@ fun SearchTopBar(
 fun SearchScreen(
     selectedItem: Int?,
     onItemClick: (Int) -> Unit,
+    viewMode: GalleryViewMode,
     modifier: Modifier = Modifier
 ) {
-    // Grid of placeholder cards (Instagram-style)
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+    PostsGallery(
+        selectedItem = selectedItem,
+        onItemClick = onItemClick,
+        viewMode = viewMode,
         modifier = modifier
-            .fillMaxSize(),
-        contentPadding = PaddingValues(1.dp),
-        verticalArrangement = Arrangement.spacedBy(1.dp),
-        horizontalArrangement = Arrangement.spacedBy(1.dp)
-    ) {
-        items(30) { index ->
-            val isSelected = index == selectedItem
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .then(
-                        if (isSelected) {
-                            Modifier.border(4.dp, MaterialTheme.colorScheme.primary)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .clickable { onItemClick(index) }
-            )
-        }
-    }
+    )
 }
 
 @Preview(showBackground = true, showSystemUi = true)
@@ -155,8 +149,8 @@ fun SearchScreen(
 fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
-            SearchTopBar(searchQuery = "", onSearchQueryChange = {}, onAddClick = {})
-            SearchScreen(selectedItem = null, onItemClick = {})
+            SearchTopBar(searchQuery = "", onSearchQueryChange = {}, onAddClick = {}, viewMode = GalleryViewMode.GRID, onViewModeChange = {})
+            SearchScreen(selectedItem = null, onItemClick = {}, viewMode = GalleryViewMode.GRID)
         }
     }
 }
