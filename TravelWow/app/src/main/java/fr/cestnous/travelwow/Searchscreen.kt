@@ -1,6 +1,7 @@
 package fr.cestnous.travelwow
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -19,19 +20,20 @@ import fr.cestnous.travelwow.ui.theme.TravelWowTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(modifier: Modifier = Modifier) {
-    var searchQuery by remember { mutableStateOf("") }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+fun SearchTopBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxWidth()
     ) {
-        // Search Bar Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -52,7 +54,7 @@ fun SearchScreen(modifier: Modifier = Modifier) {
             // Search TextField
             TextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = onSearchQueryChange,
                 placeholder = {
                     Text(
                         text = "Recherche",
@@ -84,26 +86,31 @@ fun SearchScreen(modifier: Modifier = Modifier) {
                     .height(52.dp)
             )
         }
+    }
+}
 
-        // Grid of placeholder cards
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            items(15) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(0.75f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
+@Composable
+fun SearchScreen(
+    onItemClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Grid of placeholder cards (Instagram-style)
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(1.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
+        items(30) { index ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { onItemClick(index) }
+            )
         }
     }
 }
@@ -112,6 +119,9 @@ fun SearchScreen(modifier: Modifier = Modifier) {
 @Composable
 fun SearchScreenPreview() {
     TravelWowTheme {
-        SearchScreen()
+        Column {
+            SearchTopBar(searchQuery = "", onSearchQueryChange = {})
+            SearchScreen(onItemClick = {})
+        }
     }
 }

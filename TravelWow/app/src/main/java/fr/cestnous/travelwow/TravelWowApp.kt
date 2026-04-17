@@ -1,16 +1,15 @@
 package fr.cestnous.travelwow
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
@@ -19,6 +18,10 @@ import com.google.firebase.auth.FirebaseAuth
 @Composable
 fun TravelWowApp(onLogout: () -> Unit) {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedItem by remember { mutableStateOf<Int?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -40,18 +43,73 @@ fun TravelWowApp(onLogout: () -> Unit) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                TopAppBar(
-                    title = { Text("TravelWow") },
-                    actions = {
-                        IconButton(onClick = onLogout) {
-                            Icon(painterResource(R.drawable.ic_account_box), contentDescription = "Logout")
+                when (currentDestination) {
+                    AppDestinations.HOME -> SearchTopBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it }
+                    )
+                    else -> TopAppBar(
+                        title = { Text("TravelWow") },
+                        actions = {
+                            IconButton(onClick = onLogout) {
+                                Icon(
+                                    painterResource(R.drawable.ic_account_box),
+                                    contentDescription = "Logout"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
-                Greeting(name = FirebaseAuth.getInstance().currentUser?.email ?: "Utilisateur")
+            when (currentDestination) {
+                AppDestinations.HOME -> SearchScreen(
+                    onItemClick = { index ->
+                        selectedItem = index
+                        showBottomSheet = true
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+                AppDestinations.FAVORITES -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                    Text("Favoris", modifier = Modifier.align(Alignment.Center))
+                }
+                AppDestinations.PROFILE -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                    Text("Profil", modifier = Modifier.align(Alignment.Center))
+                }
+            }
+
+            if (showBottomSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showBottomSheet = false },
+                    sheetState = sheetState
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Détails du parcours #$selectedItem",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Ceci est une description générique du parcours sélectionné. " +
+                                    "Ici apparaîtront les informations détaillées comme la durée, " +
+                                    "la distance et les points d'intérêt.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
             }
         }
     }
