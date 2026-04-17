@@ -29,9 +29,20 @@ fun TravelWowApp(
     user: FirebaseUser,
     onLogout: () -> Unit
 ) {
-    val username = user.displayName?.ifBlank { null } ?: user.email?.substringBefore("@") ?: "Utilisateur"
+    val username = remember(user) {
+        user.displayName?.takeIf { it.isNotBlank() } 
+            ?: user.email?.substringBefore("@") 
+            ?: "Utilisateur"
+    }
     
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showEditProfile by rememberSaveable { mutableStateOf(false) }
+    var userBio by rememberSaveable { mutableStateOf("Explorateur de sentiers et passionné de randonnée. 🏔️🥾\nPartage mes meilleurs parcours autour du monde.") }
+    var customUsername by rememberSaveable { mutableStateOf("") }
+    
+    val effectiveUsername = if (customUsername.isNotBlank()) customUsername else username
+
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<Int?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
@@ -59,8 +70,11 @@ fun TravelWowApp(
                         )
                     },
                     label = { Text(it.label) },
-                    selected = it == currentDestination,
-                    onClick = { currentDestination = it }
+                    selected = it == currentDestination && !showSettings,
+                    onClick = {
+                        currentDestination = it
+                        showSettings = false
+                    }
                 )
             }
         }
@@ -68,103 +82,111 @@ fun TravelWowApp(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                when (currentDestination) {
-                    AppDestinations.HOME -> SearchTopBar(
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = { searchQuery = it },
-                        onAddClick = { 
-                            if (showCreatePost) {
-                                // Reset and close
+                if (showSettings || showEditProfile) {
+                    // TopAppBar is handled inside EditProfileScreen or here for Settings
+                    if (showSettings) {
+                        TopAppBar(
+                            title = { Text("Paramètres") },
+                            navigationIcon = {
+                                IconButton(onClick = { showSettings = false }) {
+                                    Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    when (currentDestination) {
+                        AppDestinations.HOME -> SearchTopBar(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            onAddClick = { 
+                                if (showCreatePost) {
+                                    // Reset and close
+                                    showCreatePost = false
+                                    postTitle = ""
+                                    postLocation = ""
+                                    postDescription = ""
+                                    postSteps = emptyList()
+                                } else {
+                                    showCreatePost = true 
+                                }
+                            },
+                            isAdding = showCreatePost,
+                            canShare = postTitle.isNotBlank() && postDescription.isNotBlank(),
+                            onShareClick = {
+                                // TODO: Firebase save logic
                                 showCreatePost = false
                                 postTitle = ""
                                 postLocation = ""
                                 postDescription = ""
                                 postSteps = emptyList()
-                            } else {
-                                showCreatePost = true 
+                            },
+                            viewMode = galleryViewMode,
+                            onViewModeChange = { galleryViewMode = it }
+                        )
+                        AppDestinations.FAVORITES -> TopAppBar(
+                            title = { Text(currentDestination.label) },
+                            actions = {
+                                IconButton(onClick = {
+                                    val newMode = if (galleryViewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                                    galleryViewMode = newMode
+                                }) {
+                                    Icon(
+                                        painter = painterResource(if (galleryViewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
+                                        contentDescription = "Changer de vue"
+                                    )
+                                }
                             }
-                        },
-                        isAdding = showCreatePost,
-                        canShare = postTitle.isNotBlank() && postDescription.isNotBlank(),
-                        onShareClick = {
-                            // TODO: Firebase save logic
-                            showCreatePost = false
-                            postTitle = ""
-                            postLocation = ""
-                            postDescription = ""
-                            postSteps = emptyList()
-                        },
-                        viewMode = galleryViewMode,
-                        onViewModeChange = { galleryViewMode = it }
-                    )
-                    AppDestinations.FAVORITES -> TopAppBar(
-                        title = { Text(currentDestination.label) },
-                        actions = {
-                            IconButton(onClick = {
-                                val newMode = if (galleryViewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
-                                galleryViewMode = newMode
-                            }) {
-                                Icon(
-                                    painter = painterResource(if (galleryViewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
-                                    contentDescription = "Changer de vue"
-                                )
-                            }
-                        }
-                    )
-                    AppDestinations.PROFILE -> { /* No TopAppBar for Profile as requested */ }
+                        )
+                        AppDestinations.PROFILE -> { /* No TopAppBar for Profile as requested */ }
+                    }
                 }
             }
         ) { innerPadding ->
-            when (currentDestination) {
-                AppDestinations.HOME -> {
-                    if (showCreatePost) {
-                        CreatePostContent(
-                            title = postTitle,
-                            onTitleChange = { postTitle = it },
-                            location = postLocation,
-                            onLocationChange = { postLocation = it },
-                            description = postDescription,
-                            onDescriptionChange = { postDescription = it },
-                            steps = postSteps,
-                            onAddStep = { postSteps = postSteps + it },
-                            onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
-                            selectedImages = emptyList(),
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    } else {
-                        SearchScreen(
-                            selectedItem = if (showBottomSheet) selectedItem else null,
-                            onItemClick = { index ->
-                                selectedItem = index
-                                showBottomSheet = true
-                            },
-                            viewMode = galleryViewMode,
-                            modifier = Modifier.padding(innerPadding)
-                        )
+            if (showSettings) {
+                SettingsScreen(modifier = Modifier.padding(innerPadding))
+            } else if (showEditProfile) {
+                EditProfileScreen(
+                    currentUsername = effectiveUsername,
+                    currentBio = userBio,
+                    onBack = { showEditProfile = false },
+                    onSave = { newName, newBio ->
+                        customUsername = newName
+                        userBio = newBio
+                        showEditProfile = false
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            } else {
+                when (currentDestination) {
+                    AppDestinations.HOME -> {
+                        if (showCreatePost) {
+                            CreatePostContent(
+                                title = postTitle,
+                                onTitleChange = { postTitle = it },
+                                location = postLocation,
+                                onLocationChange = { postLocation = it },
+                                description = postDescription,
+                                onDescriptionChange = { postDescription = it },
+                                steps = postSteps,
+                                onAddStep = { postSteps = postSteps + it },
+                                onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
+                                selectedImages = emptyList(),
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        } else {
+                            SearchScreen(
+                                selectedItem = if (showBottomSheet) selectedItem else null,
+                                onItemClick = { index ->
+                                    selectedItem = index
+                                    showBottomSheet = true
+                                },
+                                viewMode = galleryViewMode,
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
                     }
-                }
-                AppDestinations.FAVORITES -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                    PostsGallery(
-                        selectedItem = if (showBottomSheet) selectedItem else null,
-                        onItemClick = { index ->
-                            selectedItem = index
-                            showBottomSheet = true
-                        },
-                        viewMode = galleryViewMode,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                AppDestinations.PROFILE -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        ProfileHeader(
-                            username = username,
-                            viewMode = galleryViewMode,
-                            onViewModeChange = { galleryViewMode = it },
-                            onSettingsClick = onLogout
-                        )
-                        
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-                        
+                    AppDestinations.FAVORITES -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         PostsGallery(
                             selectedItem = if (showBottomSheet) selectedItem else null,
                             onItemClick = { index ->
@@ -172,18 +194,43 @@ fun TravelWowApp(
                                 showBottomSheet = true
                             },
                             viewMode = galleryViewMode,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
+                    AppDestinations.PROFILE -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            ProfileHeader(
+                                username = effectiveUsername,
+                                bio = userBio,
+                                viewMode = galleryViewMode,
+                                onViewModeChange = { galleryViewMode = it },
+                                onSettingsClick = { showSettings = true },
+                                onLogoutClick = onLogout,
+                                onEditProfileClick = { showEditProfile = true }
+                            )
+                            
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+                            
+                            PostsGallery(
+                                selectedItem = if (showBottomSheet) selectedItem else null,
+                                onItemClick = { index ->
+                                    selectedItem = index
+                                    showBottomSheet = true
+                                },
+                                viewMode = galleryViewMode,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
-            }
 
-            if (showBottomSheet) {
-                DetailsBottomSheet(
-                    selectedItem = selectedItem,
-                    onDismissRequest = { showBottomSheet = false },
-                    sheetState = sheetState
-                )
+                if (showBottomSheet) {
+                    DetailsBottomSheet(
+                        selectedItem = selectedItem,
+                        onDismissRequest = { showBottomSheet = false },
+                        sheetState = sheetState
+                    )
+                }
             }
         }
     }
@@ -193,9 +240,9 @@ enum class AppDestinations(
     val label: String,
     val icon: Int,
 ) {
-    HOME("Home", R.drawable.ic_home),
-    FAVORITES("Favorites", R.drawable.ic_favorite),
-    PROFILE("Profile", R.drawable.ic_account_box),
+    HOME("Accueil", R.drawable.ic_home),
+    FAVORITES("Favoris", R.drawable.ic_favorite),
+    PROFILE("Profil", R.drawable.ic_account_box),
 }
 
 @Composable
@@ -204,7 +251,9 @@ fun ProfileHeader(
     viewMode: GalleryViewMode,
     onViewModeChange: (GalleryViewMode) -> Unit,
     onSettingsClick: () -> Unit,
-    bio: String = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾\nPartage mes meilleurs parcours autour du monde.",
+    onLogoutClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
+    bio: String,
     postsCount: Int = 30,
     followersCount: Int = 128,
     followingCount: Int = 94
@@ -242,7 +291,7 @@ fun ProfileHeader(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                ProfileStat(label = "Posts", value = postsCount.toString())
+                ProfileStat(label = "Publications", value = postsCount.toString())
                 ProfileStat(label = "Abonnés", value = followersCount.toString())
                 ProfileStat(label = "Abonnements", value = followingCount.toString())
             }
@@ -275,9 +324,17 @@ fun ProfileHeader(
                 
                 IconButton(onClick = onSettingsClick) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_filters),
+                        painter = painterResource(R.drawable.ic_settings),
                         contentDescription = "Paramètres",
                         tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                IconButton(onClick = onLogoutClick) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_return),
+                        contentDescription = "Déconnexion",
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -292,7 +349,7 @@ fun ProfileHeader(
         
         // Edit Profile Button
         OutlinedButton(
-            onClick = { /* TODO */ },
+            onClick = onEditProfileClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(vertical = 8.dp)
@@ -315,6 +372,93 @@ fun ProfileStat(label: String, value: String) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )
+    }
+}
+
+@Composable
+fun SettingsScreen(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Préférences", style = MaterialTheme.typography.titleLarge)
+        
+        // Notifications
+        SettingsToggleItem(
+            title = "Publications des abonnés",
+            description = "Être informé quand vos amis publient un nouveau parcours",
+            initialValue = true
+        )
+        
+        SettingsToggleItem(
+            title = "Likes sur vos posts",
+            description = "Recevoir une notification quand quelqu'un aime votre publication",
+            initialValue = true
+        )
+
+        SettingsToggleItem(
+            title = "Commentaires",
+            description = "Recevoir une notification pour les nouveaux commentaires",
+            initialValue = true
+        )
+        
+        HorizontalDivider()
+        
+        Text("Compte", style = MaterialTheme.typography.titleLarge)
+        
+        SettingsNavigationItem(title = "Confidentialité")
+        SettingsNavigationItem(title = "Sécurité")
+        SettingsNavigationItem(title = "Aide et assistance")
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Text(
+            "TravelWow v1.0.0",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+    }
+}
+
+@Composable
+fun SettingsToggleItem(title: String, description: String, initialValue: Boolean) {
+    var checked by remember { mutableStateOf(initialValue) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+        }
+        Switch(checked = checked, onCheckedChange = { checked = it })
+    }
+}
+
+@Composable
+fun SettingsNavigationItem(title: String) {
+    Surface(
+        onClick = { /* TODO */ },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Icon(
+                painter = painterResource(R.drawable.ic_return), // Reuse return icon as chevron
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.outline
+            )
+        }
     }
 }
 

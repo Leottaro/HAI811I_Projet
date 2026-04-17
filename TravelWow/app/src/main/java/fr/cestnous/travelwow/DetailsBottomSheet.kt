@@ -273,7 +273,7 @@ fun CommentItem(comment: Comment) {
             ) {
                 Icon(
                     painter = painterResource(if (isLiked) R.drawable.ic_heart else R.drawable.ic_favorite),
-                    contentDescription = if (isLiked) "Unlike" else "Like",
+                    contentDescription = if (isLiked) "Ne plus aimer" else "Aimer",
                     tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
