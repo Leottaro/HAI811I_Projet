@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 data class Comment(
     val id: Int,
@@ -127,14 +129,21 @@ fun DetailsBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(),
-                contentPadding = PaddingValues(16.dp)
+                contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 item {
-                    Text(
-                        text = "Détails du parcours #$selectedItem",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Aventures à Chamonix", // Example title
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Parcours #$selectedItem • 12 km • 4h",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
 
                 item {
@@ -142,13 +151,14 @@ fun DetailsBottomSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(400.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .height(300.dp)
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(24.dp))
                     ) {
                         HorizontalPager(
                             state = pagerState,
                             modifier = Modifier.fillMaxSize(),
-                            pageSpacing = 8.dp
+                            pageSpacing = 12.dp
                         ) { page ->
                             Box(
                                 modifier = Modifier
@@ -156,57 +166,91 @@ fun DetailsBottomSheet(
                                     .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Photo ${page + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_map),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Text(
+                                    "Photo ${page + 1}", 
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
+                        
+                        // Custom Indicator
                         Row(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                .padding(bottom = 16.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                    CircleShape
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             repeat(3) { index ->
-                                val color = if (pagerState.currentPage == index)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                val active = pagerState.currentPage == index
                                 Box(
                                     modifier = Modifier
-                                        .size(8.dp)
+                                        .size(if (active) 10.dp else 6.dp)
                                         .clip(CircleShape)
-                                        .background(color)
+                                        .background(
+                                            if (active) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                        )
+                                        .align(Alignment.CenterVertically)
                                 )
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
 
                 item {
-                    Text(
-                        text = "Ceci est une description générique du parcours sélectionné. " +
-                                "Ici apparaîtront les informations détaillées comme la durée, " +
-                                "la distance et les points d'intérêt.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Text(
+                            text = "Description",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Une randonnée exceptionnelle offrant des panoramas à couper le souffle sur le massif du Mont-Blanc. Le sentier est bien balisé mais demande une bonne condition physique pour la dernière ascension.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            lineHeight = 24.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    Text(
-                        text = "Commentaires",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Commentaires",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "8 avis",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
 
                 items(mockComments, key = { it.id }) { comment ->
                     CommentItem(comment)
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
 
@@ -235,54 +279,76 @@ fun CommentItem(comment: Comment) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                text = comment.author,
+                comment.author.take(1),
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = comment.text,
-                style = MaterialTheme.typography.bodyMedium
+                color = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            IconButton(
-                onClick = {
-                    if (isLiked) {
-                        likesCount--
-                    } else {
-                        likesCount++
-                    }
-                    isLiked = !isLiked
-                },
-                modifier = Modifier.size(24.dp)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(if (isLiked) R.drawable.ic_heart else R.drawable.ic_favorite),
-                    contentDescription = if (isLiked) "Ne plus aimer" else "Aimer",
-                    tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(20.dp)
+                Text(
+                    text = comment.author,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Il y a 2j",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = likesCount.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline
+                text = comment.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        if (isLiked) likesCount-- else likesCount++
+                        isLiked = !isLiked
+                    },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(if (isLiked) R.drawable.ic_heart else R.drawable.ic_favorite),
+                        contentDescription = null,
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = likesCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    "Répondre",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

@@ -1,5 +1,8 @@
 package fr.cestnous.travelwow
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,21 +15,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
     currentUsername: String,
     currentBio: String,
+    currentPhotoUri: String?,
     onBack: () -> Unit,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var username by remember { mutableStateOf(currentUsername) }
     var bio by remember { mutableStateOf(currentBio) }
+    var selectedImageUri by remember { mutableStateOf<String?>(currentPhotoUri) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            uri?.let {
+                selectedImageUri = it.toString()
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -34,14 +50,29 @@ fun EditProfileScreen(
                 title = { Text("Modifier le profil") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
+                        Icon(
+                            painterResource(R.drawable.ic_return),
+                            contentDescription = "Retour",
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 },
                 actions = {
-                    TextButton(onClick = { onSave(username, bio) }) {
-                        Text("Enregistrer", fontWeight = FontWeight.Bold)
+                    TextButton(
+                        onClick = { onSave(username, bio, selectedImageUri) },
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            "Enregistrer",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         modifier = modifier
@@ -51,75 +82,127 @@ fun EditProfileScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
             // Profile Picture Modification
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(100.dp)
+                        .size(120.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable { /* TODO: Image Picker */ },
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_account_box),
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "Photo de profil",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_account_box),
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    
                     // Overlay "Change" icon
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
+                            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.BottomCenter
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_add), // Using add as a placeholder for camera/edit
-                            contentDescription = "Changer la photo",
-                            tint = androidx.compose.ui.graphics.Color.White
-                        )
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().height(32.dp),
+                            color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_add),
+                                    contentDescription = "Changer la photo",
+                                    tint = androidx.compose.ui.graphics.Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
                 }
-                TextButton(onClick = { /* TODO: Image Picker */ }) {
-                    Text("Changer la photo de profil")
-                }
+                Text(
+                    "Modifier la photo",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                )
             }
 
-            // Username Field
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Nom d'utilisateur") },
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Username Field
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Nom d'utilisateur") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
 
-            // Bio Field
-            OutlinedTextField(
-                value = bio,
-                onValueChange = { bio = it },
-                label = { Text("Bio") },
-                placeholder = { Text("Racontez votre histoire...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp),
+                // Bio Field
+                OutlinedTextField(
+                    value = bio,
+                    onValueChange = { bio = it },
+                    label = { Text("Bio") },
+                    placeholder = { Text("Racontez votre histoire...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+            }
+            
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ),
                 shape = RoundedCornerShape(12.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                "Les informations de votre profil sont visibles par tout le monde.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            ) {
+                Text(
+                    "Les informations de votre profil sont visibles par tout le monde sur TravelWow.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
         }
     }
 }
