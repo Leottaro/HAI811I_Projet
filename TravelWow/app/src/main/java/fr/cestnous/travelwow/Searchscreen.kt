@@ -1,6 +1,7 @@
 package fr.cestnous.travelwow
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -91,6 +92,7 @@ fun SearchTopBar(
 
 @Composable
 fun SearchScreen(
+    selectedItem: Int?,
     onItemClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -104,11 +106,19 @@ fun SearchScreen(
         horizontalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         items(30) { index ->
+            val isSelected = index == selectedItem
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(4.dp, MaterialTheme.colorScheme.primary)
+                        } else {
+                            Modifier
+                        }
+                    )
                     .clickable { onItemClick(index) }
             )
         }
@@ -121,7 +131,7 @@ fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
             SearchTopBar(searchQuery = "", onSearchQueryChange = {})
-            SearchScreen(onItemClick = {})
+            SearchScreen(selectedItem = null, onItemClick = {})
         }
     }
 }

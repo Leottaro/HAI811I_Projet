@@ -30,6 +30,80 @@ fun DetailsBottomSheet(
     onDismissRequest: () -> Unit,
     sheetState: SheetState
 ) {
+    var showReportDialog by remember { mutableStateOf(false) }
+    var selectedReason by remember { mutableStateOf<String?>(null) }
+    var otherReason by remember { mutableStateOf("") }
+    val reportReasons = listOf("Contenu inapproprié", "Spam", "Fausse information", "Autre")
+
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showReportDialog = false
+                selectedReason = null
+                otherReason = ""
+            },
+            title = { Text("Signaler le parcours") },
+            text = {
+                Column {
+                    Text("Pourquoi souhaitez-vous signaler ce parcours ?")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    reportReasons.forEach { reason ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = (selectedReason == reason),
+                                onClick = { selectedReason = reason }
+                            )
+                            Text(
+                                text = reason,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+
+                    if (selectedReason == "Autre") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = otherReason,
+                            onValueChange = { otherReason = it },
+                            label = { Text("Précisez la raison") },
+                            placeholder = { Text("Décrivez le problème...") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                val isEnabled = selectedReason != null && (selectedReason != "Autre" || otherReason.isNotBlank())
+                TextButton(
+                    onClick = {
+                        // TODO: Implement report submission logic
+                        showReportDialog = false
+                        selectedReason = null
+                        otherReason = ""
+                    },
+                    enabled = isEnabled
+                ) {
+                    Text("Signaler", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showReportDialog = false
+                    selectedReason = null
+                    otherReason = ""
+                }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
@@ -48,93 +122,109 @@ fun DetailsBottomSheet(
             )
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(),
-            contentPadding = PaddingValues(16.dp)
-        ) {
-            item {
-                Text(
-                    text = "Détails du parcours #$selectedItem",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Détails du parcours #$selectedItem",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-            item {
-                val pagerState = rememberPagerState(pageCount = { 3 })
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                ) {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        pageSpacing = 8.dp
-                    ) { page ->
-                        Box(
-                            modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("Photo ${page + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    repeat(3) { index ->
-                                        val color = if (pagerState.currentPage == index)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(color)
-                                        )
-                                    }
-                                }
+                item {
+                    val pagerState = rememberPagerState(pageCount = { 3 })
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(400.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            pageSpacing = 8.dp
+                        ) { page ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Photo ${page + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
-
-                        item {
-                            Text(
-                                text = "Ceci est une description générique du parcours sélectionné. " +
-                                        "Ici apparaîtront les informations détaillées comme la durée, " +
-                                        "la distance et les points d'intérêt.",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = "Commentaires",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-
-                        items(mockComments, key = { it.id }) { comment ->
-                            CommentItem(comment)
-                        }
-
-                        item {
-                            Spacer(modifier = Modifier.height(32.dp))
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            repeat(3) { index ->
+                                val color = if (pagerState.currentPage == index)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                )
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
+
+                item {
+                    Text(
+                        text = "Ceci est une description générique du parcours sélectionné. " +
+                                "Ici apparaîtront les informations détaillées comme la durée, " +
+                                "la distance et les points d'intérêt.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Commentaires",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                items(mockComments, key = { it.id }) { comment ->
+                    CommentItem(comment)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+
+            // Report button in the upper-right corner
+            IconButton(
+                onClick = { showReportDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_warning),
+                    contentDescription = "Signaler",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -73,6 +73,7 @@ fun TravelWowApp(onLogout: () -> Unit) {
         ) { innerPadding ->
             when (currentDestination) {
                 AppDestinations.HOME -> SearchScreen(
+                    selectedItem = if (showBottomSheet) selectedItem else null,
                     onItemClick = { index ->
                         selectedItem = index
                         showBottomSheet = true
