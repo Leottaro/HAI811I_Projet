@@ -2,10 +2,14 @@ package fr.cestnous.travelwow
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
@@ -24,7 +28,9 @@ fun TravelWowApp(onLogout: () -> Unit) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<Int?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = false
+    )
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -82,75 +88,11 @@ fun TravelWowApp(onLogout: () -> Unit) {
             }
 
             if (showBottomSheet) {
-                ModalBottomSheet(
+                DetailsBottomSheet(
+                    selectedItem = selectedItem,
                     onDismissRequest = { showBottomSheet = false },
                     sheetState = sheetState
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Détails du parcours #$selectedItem",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        val pagerState = rememberPagerState(pageCount = { 3 })
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(250.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                        ) {
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                pageSpacing = 8.dp
-                            ) { page ->
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("Photo ${page + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            
-                            // Simple pager indicator
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                repeat(3) { index ->
-                                    val color = if (pagerState.currentPage == index) 
-                                        MaterialTheme.colorScheme.primary 
-                                    else 
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Ceci est une description générique du parcours sélectionné. " +
-                                    "Ici apparaîtront les informations détaillées comme la durée, " +
-                                    "la distance et les points d'intérêt.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(32.dp))
-                    }
-                }
+                )
             }
         }
     }
