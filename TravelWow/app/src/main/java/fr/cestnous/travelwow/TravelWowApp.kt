@@ -28,6 +28,13 @@ fun TravelWowApp(onLogout: () -> Unit) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<Int?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
+    
+    // Create Post State
+    var showCreatePost by remember { mutableStateOf(false) }
+    var postTitle by remember { mutableStateOf("") }
+    var postLocation by remember { mutableStateOf("") }
+    var postDescription by remember { mutableStateOf("") }
+    
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
     )
@@ -55,7 +62,27 @@ fun TravelWowApp(onLogout: () -> Unit) {
                 when (currentDestination) {
                     AppDestinations.HOME -> SearchTopBar(
                         searchQuery = searchQuery,
-                        onSearchQueryChange = { searchQuery = it }
+                        onSearchQueryChange = { searchQuery = it },
+                        onAddClick = { 
+                            if (showCreatePost) {
+                                // Reset and close
+                                showCreatePost = false
+                                postTitle = ""
+                                postLocation = ""
+                                postDescription = ""
+                            } else {
+                                showCreatePost = true 
+                            }
+                        },
+                        isAdding = showCreatePost,
+                        canShare = postTitle.isNotBlank() && postDescription.isNotBlank(),
+                        onShareClick = {
+                            // TODO: Firebase save logic
+                            showCreatePost = false
+                            postTitle = ""
+                            postLocation = ""
+                            postDescription = ""
+                        }
                     )
                     else -> TopAppBar(
                         title = { Text("TravelWow") },
@@ -72,14 +99,29 @@ fun TravelWowApp(onLogout: () -> Unit) {
             }
         ) { innerPadding ->
             when (currentDestination) {
-                AppDestinations.HOME -> SearchScreen(
-                    selectedItem = if (showBottomSheet) selectedItem else null,
-                    onItemClick = { index ->
-                        selectedItem = index
-                        showBottomSheet = true
-                    },
-                    modifier = Modifier.padding(innerPadding)
-                )
+                AppDestinations.HOME -> {
+                    if (showCreatePost) {
+                        CreatePostContent(
+                            title = postTitle,
+                            onTitleChange = { postTitle = it },
+                            location = postLocation,
+                            onLocationChange = { postLocation = it },
+                            description = postDescription,
+                            onDescriptionChange = { postDescription = it },
+                            selectedImages = emptyList(),
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        SearchScreen(
+                            selectedItem = if (showBottomSheet) selectedItem else null,
+                            onItemClick = { index ->
+                                selectedItem = index
+                                showBottomSheet = true
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                }
                 AppDestinations.FAVORITES -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                     Text("Favoris", modifier = Modifier.align(Alignment.Center))
                 }

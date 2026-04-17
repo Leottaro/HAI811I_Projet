@@ -24,6 +24,10 @@ import fr.cestnous.travelwow.ui.theme.TravelWowTheme
 fun SearchTopBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    onAddClick: () -> Unit,
+    isAdding: Boolean = false,
+    onShareClick: () -> Unit = {},
+    canShare: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -38,54 +42,75 @@ fun SearchTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // "+" Button
+            // "+" / "Cancel" Button
             IconButton(
-                onClick = { /* TODO */ },
+                onClick = onAddClick,
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_add),
-                    contentDescription = "Ajouter",
+                    painter = painterResource(if (isAdding) R.drawable.ic_return else R.drawable.ic_add),
+                    contentDescription = if (isAdding) "Annuler" else "Ajouter",
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            // Search TextField
-            TextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = {
-                    Text(
-                        text = "Recherche",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                trailingIcon = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_filters),
-                            contentDescription = "Filtres",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            if (!isAdding) {
+                // Search TextField
+                TextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = {
+                        Text(
+                            text = "Recherche",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp)
-            )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { /* TODO */ }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_filters),
+                                contentDescription = "Filtres",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                )
+            } else {
+                // "Nouveau parcours" Title
+                Text(
+                    text = "Nouveau parcours",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Share Button
+                TextButton(
+                    onClick = onShareClick,
+                    enabled = canShare
+                ) {
+                    Text(
+                        "Partager",
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
         }
     }
 }
@@ -130,7 +155,7 @@ fun SearchScreen(
 fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
-            SearchTopBar(searchQuery = "", onSearchQueryChange = {})
+            SearchTopBar(searchQuery = "", onSearchQueryChange = {}, onAddClick = {})
             SearchScreen(selectedItem = null, onItemClick = {})
         }
     }
