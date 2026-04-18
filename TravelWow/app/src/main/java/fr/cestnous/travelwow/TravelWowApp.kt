@@ -53,11 +53,17 @@ fun TravelWowApp(
     
     // Create Post State
     var showCreatePost by remember { mutableStateOf(false) }
+    var showAddStep by remember { mutableStateOf(false) }
     var postTitle by remember { mutableStateOf("") }
     var postLocation by remember { mutableStateOf("") }
     var postDescription by remember { mutableStateOf("") }
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
     var isSavingPost by remember { mutableStateOf(false) }
+
+    // State for AddStepScreen
+    var currentStepName by remember { mutableStateOf("") }
+    var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
+    var currentStepLocation by remember { mutableStateOf(com.google.android.gms.maps.model.LatLng(43.6107, 3.8767)) }
 
     val coroutineScope = rememberCoroutineScope()
     val db = remember { Firebase.firestore }
@@ -67,7 +73,7 @@ fun TravelWowApp(
     )
 
     NavigationSuiteScaffold(
-        modifier = Modifier.padding(bottom = 16.dp),
+        modifier = Modifier.fillMaxSize(),
         navigationSuiteItems = {
             AppDestinations.entries.forEach {
                 item(
@@ -104,24 +110,41 @@ fun TravelWowApp(
                         )
                     }
                 } else {
-                    when (currentDestination) {
+                        when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
                             searchQuery = searchQuery,
                             onSearchQueryChange = { searchQuery = it },
-                            onAddClick = { 
-                                if (showCreatePost) {
-                                    // Reset and close
-                                    showCreatePost = false
-                                    postTitle = ""
-                                    postLocation = ""
-                                    postDescription = ""
-                                    postSteps = emptyList()
-                                } else {
-                                    showCreatePost = true 
-                                }
+                            onAddClick = { showCreatePost = true },
+                            onResetPost = {
+                                // Reset and close
+                                showCreatePost = false
+                                postTitle = ""
+                                postLocation = ""
+                                postDescription = ""
+                                postSteps = emptyList()
                             },
                             isAdding = showCreatePost,
-                            canShare = postTitle.isNotBlank() && postLocation.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost,
+                            isAddingStep = showAddStep,
+                            onBackStepClick = { 
+                                showAddStep = false
+                                // Reset step state when going back
+                                currentStepName = ""
+                                currentStepImages = emptyList()
+                            },
+                            onConfirmStepClick = {
+                                postSteps = postSteps + TravelStep(
+                                    name = currentStepName.ifBlank { "Étape sans nom" },
+                                    latitude = currentStepLocation.latitude,
+                                    longitude = currentStepLocation.longitude,
+                                    images = currentStepImages
+                                )
+                                showAddStep = false
+                                // Reset step state
+                                currentStepName = ""
+                                currentStepImages = emptyList()
+                            },
+                            canConfirmStep = currentStepName.isNotBlank(),
+                            canShare = postTitle.isNotBlank() && postLocation.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost && !showAddStep,
                             onShareClick = {
                                 isSavingPost = true
                                 coroutineScope.launch {
@@ -181,78 +204,63 @@ fun TravelWowApp(
                 }
             }
         ) { innerPadding ->
-            Column(modifier = Modifier.fillMaxSize()) {
-                Box(modifier = Modifier.weight(1f)) {
-                    if (showSettings) {
-                        SettingsScreen(modifier = Modifier.padding(innerPadding))
-                    } else if (showEditProfile) {
-                        EditProfileScreen(
-                            currentUsername = effectiveUsername,
-                            currentBio = userBio,
-                            currentPhotoUri = profilePhotoUri,
-                            onBack = { showEditProfile = false },
-                            onSave = { newName, newBio, newPhotoUri ->
-                                customUsername = newName
-                                userBio = newBio
-                                profilePhotoUri = newPhotoUri
-                                showEditProfile = false
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    } else {
-                        when (currentDestination) {
-                            AppDestinations.HOME -> {
-                                if (showCreatePost) {
-                                    CreatePostContent(
-                                        title = postTitle,
-                                        onTitleChange = { postTitle = it },
-                                        location = postLocation,
-                                        onLocationChange = { postLocation = it },
-                                        description = postDescription,
-                                        onDescriptionChange = { postDescription = it },
-                                        steps = postSteps,
-                                        onAddStep = { postSteps = postSteps + it },
-                                        onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                } else {
-                                    SearchScreen(
-                                        selectedItem = if (showBottomSheet) selectedItem else null,
-                                        onItemClick = { index ->
-                                            selectedItem = index
-                                            showBottomSheet = true
-                                        },
-                                        viewMode = galleryViewMode,
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
+            if (showEditProfile) {
+                EditProfileScreen(
+                    currentUsername = effectiveUsername,
+                    currentBio = userBio,
+                    currentPhotoUri = profilePhotoUri,
+                    onBack = { showEditProfile = false },
+                    onSave = { newName, newBio, newPhotoUri ->
+                        customUsername = newName
+                        userBio = newBio
+                        profilePhotoUri = newPhotoUri
+                        showEditProfile = false
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (showSettings) {
+                            SettingsScreen()
+                        } else {
+                            when (currentDestination) {
+                                AppDestinations.HOME -> {
+                                    if (showAddStep) {
+                                        AddStepScreen(
+                                            stepName = currentStepName,
+                                            onStepNameChange = { currentStepName = it },
+                                            stepImages = currentStepImages,
+                                            onStepImagesChange = { currentStepImages = it },
+                                            onLocationSelected = { currentStepLocation = it },
+                                            modifier = Modifier
+                                        )
+                                    } else if (showCreatePost) {
+                                        CreatePostContent(
+                                            title = postTitle,
+                                            onTitleChange = { postTitle = it },
+                                            location = postLocation,
+                                            onLocationChange = { postLocation = it },
+                                            description = postDescription,
+                                            onDescriptionChange = { postDescription = it },
+                                            steps = postSteps,
+                                            onAddStepClick = { showAddStep = true },
+                                            onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
+                                            modifier = Modifier
+                                        )
+                                    } else {
+                                        SearchScreen(
+                                            selectedItem = if (showBottomSheet) selectedItem else null,
+                                            onItemClick = { index ->
+                                                selectedItem = index
+                                                showBottomSheet = true
+                                            },
+                                            viewMode = galleryViewMode,
+                                            modifier = Modifier
+                                        )
+                                    }
                                 }
-                            }
-                            AppDestinations.FAVORITES -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                                PostsGallery(
-                                    selectedItem = if (showBottomSheet) selectedItem else null,
-                                    onItemClick = { index ->
-                                        selectedItem = index
-                                        showBottomSheet = true
-                                    },
-                                    viewMode = galleryViewMode,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            AppDestinations.PROFILE -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    ProfileHeader(
-                                        username = effectiveUsername,
-                                        bio = userBio,
-                                        photoUri = profilePhotoUri,
-                                        viewMode = galleryViewMode,
-                                        onViewModeChange = { galleryViewMode = it },
-                                        onSettingsClick = { showSettings = true },
-                                        onLogoutClick = onLogout,
-                                        onEditProfileClick = { showEditProfile = true }
-                                    )
-
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-
+                                AppDestinations.FAVORITES -> Box(modifier = Modifier.fillMaxSize()) {
                                     PostsGallery(
                                         selectedItem = if (showBottomSheet) selectedItem else null,
                                         onItemClick = { index ->
@@ -260,29 +268,47 @@ fun TravelWowApp(
                                             showBottomSheet = true
                                         },
                                         viewMode = galleryViewMode,
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.fillMaxSize()
                                     )
+                                }
+                                AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        ProfileHeader(
+                                            username = effectiveUsername,
+                                            bio = userBio,
+                                            photoUri = profilePhotoUri,
+                                            viewMode = galleryViewMode,
+                                            onViewModeChange = { galleryViewMode = it },
+                                            onSettingsClick = { showSettings = true },
+                                            onLogoutClick = onLogout,
+                                            onEditProfileClick = { showEditProfile = true }
+                                        )
+
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+
+                                        PostsGallery(
+                                            selectedItem = if (showBottomSheet) selectedItem else null,
+                                            onItemClick = { index ->
+                                                selectedItem = index
+                                                showBottomSheet = true
+                                            },
+                                            viewMode = galleryViewMode,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
-
-                        if (showBottomSheet) {
-                            DetailsBottomSheet(
-                                selectedItem = selectedItem,
-                                onDismissRequest = { showBottomSheet = false },
-                                sheetState = sheetState
-                            )
-                        }
                     }
                 }
+            }
 
-                if (showBottomSheet) {
-                    DetailsBottomSheet(
-                        selectedItem = selectedItem,
-                        onDismissRequest = { showBottomSheet = false },
-                        sheetState = sheetState
-                    )
-                }
+            if (showBottomSheet) {
+                DetailsBottomSheet(
+                    selectedItem = selectedItem,
+                    onDismissRequest = { showBottomSheet = false },
+                    sheetState = sheetState
+                )
             }
         }
     }
@@ -314,7 +340,6 @@ fun ProfileHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {

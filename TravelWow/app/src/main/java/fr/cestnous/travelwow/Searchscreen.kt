@@ -26,103 +26,131 @@ fun SearchTopBar(
     onSearchQueryChange: (String) -> Unit,
     onAddClick: () -> Unit,
     isAdding: Boolean = false,
+    isAddingStep: Boolean = false,
+    onBackStepClick: () -> Unit = {},
+    onConfirmStepClick: () -> Unit = {},
+    canConfirmStep: Boolean = false,
     onShareClick: () -> Unit = {},
     canShare: Boolean = false,
     viewMode: GalleryViewMode = GalleryViewMode.GRID,
     onViewModeChange: (GalleryViewMode) -> Unit = {},
+    onResetPost: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // "+" / "Cancel" Button
-            IconButton(
-                onClick = onAddClick,
+        Column(modifier = Modifier.statusBarsPadding()) {
+            Row(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    painter = painterResource(if (isAdding) R.drawable.ic_return else R.drawable.ic_add),
-                    contentDescription = if (isAdding) "Annuler" else "Ajouter",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            if (!isAdding) {
-                // Search TextField
-                TextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = {
-                        Text(
-                            text = "Recherche",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                // "+" / "Cancel" / "Back" Button
+                IconButton(
+                    onClick = {
+                        if (isAddingStep) onBackStepClick()
+                        else if (isAdding) onResetPost()
+                        else onAddClick()
                     },
-                    trailingIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = {
-                                val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
-                                onViewModeChange(newMode)
-                            }) {
-                                Icon(
-                                    painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
-                                    contentDescription = "Changer de vue",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(onClick = { /* TODO */ }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_filters),
-                                    contentDescription = "Filtres",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
                     modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                )
-            } else {
-                // "Nouveau parcours" Title
-                Text(
-                    text = "Nouveau parcours",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                
-                // Share Button
-                TextButton(
-                    onClick = onShareClick,
-                    enabled = canShare
+                        .size(44.dp)
+                        .clip(CircleShape)
                 ) {
-                    Text(
-                        "Partager",
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    Icon(
+                        painter = painterResource(
+                            if (isAddingStep) R.drawable.ic_return 
+                            else if (isAdding) R.drawable.ic_return 
+                            else R.drawable.ic_add
+                        ),
+                        contentDescription = if (isAddingStep || isAdding) "Retour" else "Ajouter",
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
+                }
+
+                if (!isAdding && !isAddingStep) {
+                    // Search TextField
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                text = "Recherche",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                                    onViewModeChange(newMode)
+                                }) {
+                                    Icon(
+                                        painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
+                                        contentDescription = "Changer de vue",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = { /* TODO */ }) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_filters),
+                                        contentDescription = "Filtres",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                    )
+                } else {
+                    // Title
+                    Text(
+                        text = if (isAddingStep) "Ajouter une étape" else "Nouveau parcours",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    if (isAddingStep) {
+                        // Add Step Button
+                        TextButton(
+                            onClick = onConfirmStepClick,
+                            enabled = canConfirmStep
+                        ) {
+                            Text(
+                                "Ajouter",
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = if (canConfirmStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else {
+                        // Share Button
+                        TextButton(
+                            onClick = onShareClick,
+                            enabled = canShare
+                        ) {
+                            Text(
+                                "Partager",
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
                 }
             }
         }
