@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
+    userId: String,
     currentUsername: String,
     currentBio: String,
     currentPhotoUri: String?,
@@ -34,6 +35,38 @@ fun EditProfileScreen(
     var username by remember { mutableStateOf(currentUsername) }
     var bio by remember { mutableStateOf(currentBio) }
     var selectedImageUri by remember { mutableStateOf<String?>(currentPhotoUri) }
+    var showPreview by remember { mutableStateOf(false) }
+    var showSaveConfirmation by remember { mutableStateOf(false) }
+
+    if (showPreview) {
+        UserDetailDialog(
+            userId = userId,
+            onDismiss = { showPreview = false }
+        )
+    }
+
+    if (showSaveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSaveConfirmation = false },
+            title = { Text("Enregistrer les modifications") },
+            text = { Text("Voulez-vous enregistrer ces informations sur votre profil Firebase ? Elles seront visibles par les autres randonneurs.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSaveConfirmation = false
+                        onSave(username, bio, selectedImageUri)
+                    }
+                ) {
+                    Text("Confirmer", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveConfirmation = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -58,8 +91,15 @@ fun EditProfileScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showPreview = true }) {
+                        Icon(
+                            painterResource(R.drawable.ic_account_box),
+                            contentDescription = "Aperçu du profil",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     TextButton(
-                        onClick = { onSave(username, bio, selectedImageUri) },
+                        onClick = { showSaveConfirmation = true },
                         contentPadding = PaddingValues(horizontal = 16.dp)
                     ) {
                         Text(

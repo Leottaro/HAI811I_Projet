@@ -6,7 +6,7 @@ import com.google.firebase.firestore.PropertyName
 
 /**
  * Model representing a User in Firestore.
- * Path: /users/{userId}
+ * Path: /travelpath/users/{userId}
  */
 data class FirebaseUser(
     @DocumentId val id: String = "",
@@ -31,7 +31,7 @@ data class FirebaseUserSettings(
 
 /**
  * Model representing a Post (Parcours) in Firestore.
- * Path: /posts/{postId}
+ * Path: /travelpath/posts/{postId}
  */
 data class FirebasePost(
     @DocumentId val id: String = "",
@@ -55,7 +55,7 @@ data class FirebasePost(
 
 /**
  * Model representing a Step within a Post.
- * Path: /posts/{postId}/steps/{stepId}
+ * Path: /travelpath/posts/{postId}/steps/{stepId}
  */
 data class FirebaseStep(
     @DocumentId val id: String = "",
@@ -70,7 +70,7 @@ data class FirebaseStep(
 
 /**
  * Model representing a Comment on a Post.
- * Path: /posts/{postId}/comments/{commentId}
+ * Path: /travelpath/posts/{postId}/comments/{commentId}
  */
 data class FirebaseComment(
     @DocumentId val id: String = "",

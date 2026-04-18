@@ -1,6 +1,7 @@
 package fr.cestnous.travelwow
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.sp
 data class Comment(
     val id: Int,
     val author: String,
+    val authorId: String, // Added authorId
     val text: String,
     val initialLikes: Int
 )
@@ -36,6 +38,19 @@ fun DetailsBottomSheet(
     var selectedReason by remember { mutableStateOf<String?>(null) }
     var otherReason by remember { mutableStateOf("") }
     val reportReasons = listOf("Contenu inapproprié", "Spam", "Fausse information", "Autre")
+
+    var showUserDialog by remember { mutableStateOf(false) }
+    var selectedUserId by remember { mutableStateOf<String?>(null) }
+
+    if (showUserDialog && selectedUserId != null) {
+        UserDetailDialog(
+            userId = selectedUserId!!,
+            onDismiss = {
+                showUserDialog = false
+                selectedUserId = null
+            }
+        )
+    }
 
     if (showReportDialog) {
         AlertDialog(
@@ -113,14 +128,14 @@ fun DetailsBottomSheet(
     ) {
         val mockComments = remember {
             listOf(
-                Comment(1, "Utilisateur 1", "Superbe parcours ! Les vues sont magnifiques.", 12),
-                Comment(2, "Utilisateur 2", "Un peu difficile sur la fin, mais ça en vaut la peine.", 5),
-                Comment(3, "Utilisateur 3", "J'ai adoré l'étape près de la rivière.", 8),
-                Comment(4, "Utilisateur 4", "Parfait pour une rando en famille.", 3),
-                Comment(5, "Utilisateur 5", "N'oubliez pas d'apporter de l'eau, il y a peu d'ombre.", 15),
-                Comment(6, "Utilisateur 6", "Le sentier était un peu boueux, mais praticable.", 2),
-                Comment(7, "Utilisateur 7", "Une expérience incroyable au lever du soleil !", 24),
-                Comment(8, "Utilisateur 8", "Les indications sont très claires tout au long du trajet.", 7)
+                Comment(1, "Utilisateur 1", "user1_id", "Superbe parcours ! Les vues sont magnifiques.", 12),
+                Comment(2, "Utilisateur 2", "user2_id", "Un peu difficile sur la fin, mais ça en vaut la peine.", 5),
+                Comment(3, "Utilisateur 3", "user3_id", "J'ai adoré l'étape près de la rivière.", 8),
+                Comment(4, "Utilisateur 4", "user4_id", "Parfait pour une rando en famille.", 3),
+                Comment(5, "Utilisateur 5", "user5_id", "N'oubliez pas d'apporter de l'eau, il y a peu d'ombre.", 15),
+                Comment(6, "Utilisateur 6", "user6_id", "Le sentier était un peu boueux, mais praticable.", 2),
+                Comment(7, "Utilisateur 7", "user7_id", "Une expérience incroyable au lever du soleil !", 24),
+                Comment(8, "Utilisateur 8", "user8_id", "Les indications sont très claires tout au long du trajet.", 7)
             )
         }
 
@@ -250,7 +265,13 @@ fun DetailsBottomSheet(
                 }
 
                 items(mockComments, key = { it.id }) { comment ->
-                    CommentItem(comment)
+                    CommentItem(
+                        comment = comment,
+                        onAuthorClick = {
+                            selectedUserId = comment.authorId
+                            showUserDialog = true
+                        }
+                    )
                 }
             }
 
@@ -272,7 +293,10 @@ fun DetailsBottomSheet(
 }
 
 @Composable
-fun CommentItem(comment: Comment) {
+fun CommentItem(
+    comment: Comment,
+    onAuthorClick: () -> Unit = {}
+) {
     var isLiked by remember { mutableStateOf(false) }
     var likesCount by remember { mutableIntStateOf(comment.initialLikes) }
 
@@ -286,7 +310,8 @@ fun CommentItem(comment: Comment) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .clickable { onAuthorClick() },
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -305,7 +330,8 @@ fun CommentItem(comment: Comment) {
                 Text(
                     text = comment.author,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onAuthorClick() }
                 )
                 Text(
                     text = "Il y a 2j",

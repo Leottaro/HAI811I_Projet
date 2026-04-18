@@ -40,9 +40,46 @@ fun TravelWowApp(
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showEditProfile by rememberSaveable { mutableStateOf(false) }
-    var userBio by rememberSaveable { mutableStateOf("Explorateur de sentiers et passionné de randonnée. 🏔️🥾\nPartage mes meilleurs parcours autour du monde.") }
+    var userBio by rememberSaveable { mutableStateOf("") }
     var customUsername by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var userSettings by remember { mutableStateOf(FirebaseUserSettings()) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val db = remember { Firebase.firestore }
+
+    // Load user profile from Firestore
+    LaunchedEffect(user.uid) {
+        try {
+            val doc = db.collection("users").document(user.uid).get().await()
+            if (doc.exists()) {
+                val profile = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
+                profile?.let {
+                    customUsername = it.username
+                    userBio = it.bio
+                    profilePhotoUri = it.photoUrl
+                    userSettings = it.settings
+                }
+            } else {
+                // Initialize profile if it doesn't exist
+                val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
+                    ?: user.email?.substringBefore("@") 
+                    ?: "Utilisateur"
+                val initialProfile = fr.cestnous.travelwow.FirebaseUser(
+                    id = user.uid,
+                    username = initialUsername,
+                    email = user.email ?: "",
+                    bio = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾"
+                )
+                db.collection("users").document(user.uid).set(initialProfile).await()
+                customUsername = initialProfile.username
+                userBio = initialProfile.bio
+                userSettings = initialProfile.settings
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     
     val effectiveUsername = customUsername.ifBlank { username }
 
@@ -60,13 +97,33 @@ fun TravelWowApp(
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
     var isSavingPost by remember { mutableStateOf(false) }
 
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Déconnexion") },
+            text = { Text("Voulez-vous vraiment vous déconnecter de votre compte TravelWow ? Vos données resteront synchronisées sur Firebase.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                    onLogout()
+                }) {
+                    Text("Se déconnecter", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
     // State for AddStepScreen
     var currentStepName by remember { mutableStateOf("") }
     var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
     var currentStepLocation by remember { mutableStateOf(com.google.android.gms.maps.model.LatLng(43.6107, 3.8767)) }
-
-    val coroutineScope = rememberCoroutineScope()
-    val db = remember { Firebase.firestore }
     
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
@@ -97,19 +154,7 @@ fun TravelWowApp(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                if (showSettings || showEditProfile) {
-                    // TopAppBar is handled inside EditProfileScreen or here for Settings
-                    if (showSettings) {
-                        TopAppBar(
-                            title = { Text("Paramètres") },
-                            navigationIcon = {
-                                IconButton(onClick = { showSettings = false }) {
-                                    Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
-                                }
-                            }
-                        )
-                    }
-                } else {
+                if (!showSettings && !showEditProfile) {
                         when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
                             searchQuery = searchQuery,
@@ -206,25 +251,79 @@ fun TravelWowApp(
         ) { innerPadding ->
             if (showEditProfile) {
                 EditProfileScreen(
+                    userId = user.uid,
                     currentUsername = effectiveUsername,
                     currentBio = userBio,
                     currentPhotoUri = profilePhotoUri,
                     onBack = { showEditProfile = false },
                     onSave = { newName, newBio, newPhotoUri ->
-                        customUsername = newName
-                        userBio = newBio
-                        profilePhotoUri = newPhotoUri
-                        showEditProfile = false
+                        coroutineScope.launch {
+                            try {
+                                val userRef = db.collection("users").document(user.uid)
+                                val updates = mutableMapOf<String, Any>(
+                                    "username" to newName,
+                                    "bio" to newBio
+                                )
+                                newPhotoUri?.let { updates["photoUrl"] = it }
+                                
+                                userRef.update(updates).await()
+                                
+                                customUsername = newName
+                                userBio = newBio
+                                profilePhotoUri = newPhotoUri
+                                showEditProfile = false
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                // Fallback if update fails (e.g. document doesn't exist)
+                                try {
+                                    val newUser = fr.cestnous.travelwow.FirebaseUser(
+                                        id = user.uid,
+                                        username = newName,
+                                        email = user.email ?: "",
+                                        bio = newBio,
+                                        photoUrl = newPhotoUri
+                                    )
+                                    db.collection("users").document(user.uid).set(newUser).await()
+                                    customUsername = newName
+                                    userBio = newBio
+                                    profilePhotoUri = newPhotoUri
+                                    showEditProfile = false
+                                } catch (e2: Exception) {
+                                    e2.printStackTrace()
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (showSettings) {
+                SettingsScreen(
+                    settings = userSettings,
+                    userEmail = user.email ?: "Utilisateur",
+                    onBack = { showSettings = false },
+                    onLogout = { 
+                        showSettings = false
+                        onLogout() 
+                    },
+                    onSave = { newSettings ->
+                        coroutineScope.launch {
+                            try {
+                                db.collection("users").document(user.uid)
+                                    .update("settings", newSettings)
+                                    .await()
+                                userSettings = newSettings
+                                showSettings = false
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                     Box(modifier = Modifier.weight(1f)) {
-                        if (showSettings) {
-                            SettingsScreen()
-                        } else {
-                            when (currentDestination) {
+                        when (currentDestination) {
                                 AppDestinations.HOME -> {
                                     if (showAddStep) {
                                         AddStepScreen(
@@ -281,7 +380,7 @@ fun TravelWowApp(
                                             viewMode = galleryViewMode,
                                             onViewModeChange = { galleryViewMode = it },
                                             onSettingsClick = { showSettings = true },
-                                            onLogoutClick = onLogout,
+                                            onLogoutClick = { showLogoutDialog = true },
                                             onEditProfileClick = { showEditProfile = true }
                                         )
 
@@ -313,8 +412,6 @@ fun TravelWowApp(
             }
         }
     }
-}
-
 enum class AppDestinations(
     val label: String,
     val icon: Int,
@@ -496,90 +593,180 @@ fun ProfileStat(label: String, value: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                "Préférences",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    SettingsToggleItem(
-                        title = "Publications des abonnés",
-                        description = "Nouveaux parcours de vos amis",
-                        initialValue = true
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    SettingsToggleItem(
-                        title = "Likes sur vos posts",
-                        description = "Alertes pour les nouveaux likes",
-                        initialValue = true
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    SettingsToggleItem(
-                        title = "Commentaires",
-                        description = "Notifications pour les messages",
-                        initialValue = true
-                    )
+fun SettingsScreen(
+    settings: FirebaseUserSettings,
+    userEmail: String,
+    onBack: () -> Unit,
+    onSave: (FirebaseUserSettings) -> Unit,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var currentSettings by remember { mutableStateOf(settings) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveDialog = false },
+            title = { Text("Enregistrer les préférences") },
+            text = { Text("Voulez-vous synchroniser ces paramètres avec votre compte Firebase ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSaveDialog = false
+                    onSave(currentSettings)
+                }) {
+                    Text("Confirmer", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveDialog = false }) {
+                    Text("Annuler")
                 }
             }
-        }
-        
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                "Compte",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column {
-                    SettingsNavigationItem(title = "Confidentialité")
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    SettingsNavigationItem(title = "Sécurité")
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    SettingsNavigationItem(title = "Aide et assistance")
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Text(
-            "TravelWow v1.0.0",
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.outline
         )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Déconnexion") },
+            text = { Text("Voulez-vous vraiment vous déconnecter de votre compte Firebase ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                    onLogout()
+                }) {
+                    Text("Se déconnecter", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Paramètres") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { showSaveDialog = true }) {
+                        Text("Enregistrer", fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Préférences",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsToggleItem(
+                            title = "Publications des abonnés",
+                            description = "Nouveaux parcours de vos amis",
+                            checked = currentSettings.followersPostsNotifications,
+                            onCheckedChange = { currentSettings = currentSettings.copy(followersPostsNotifications = it) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsToggleItem(
+                            title = "Likes sur vos posts",
+                            description = "Alertes pour les nouveaux likes",
+                            checked = currentSettings.likesNotifications,
+                            onCheckedChange = { currentSettings = currentSettings.copy(likesNotifications = it) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsToggleItem(
+                            title = "Commentaires",
+                            description = "Notifications pour les messages",
+                            checked = currentSettings.commentsNotifications,
+                            onCheckedChange = { currentSettings = currentSettings.copy(commentsNotifications = it) }
+                        )
+                    }
+                }
+            }
+            
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Compte",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column {
+                        SettingsNavigationItem(
+                            title = "Email : $userEmail",
+                            showChevron = false
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsNavigationItem(title = "Confidentialité")
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsNavigationItem(title = "Sécurité")
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsNavigationItem(
+                            title = "Déconnexion",
+                            onClick = { showLogoutDialog = true },
+                            textColor = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            Text(
+                "TravelWow v1.0.0",
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
     }
 }
 
 @Composable
-fun SettingsToggleItem(title: String, description: String, initialValue: Boolean) {
-    var checked by remember { mutableStateOf(initialValue) }
+fun SettingsToggleItem(
+    title: String, 
+    description: String, 
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -592,7 +779,7 @@ fun SettingsToggleItem(title: String, description: String, initialValue: Boolean
         }
         Switch(
             checked = checked, 
-            onCheckedChange = { checked = it },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
@@ -604,9 +791,14 @@ fun SettingsToggleItem(title: String, description: String, initialValue: Boolean
 }
 
 @Composable
-fun SettingsNavigationItem(title: String) {
+fun SettingsNavigationItem(
+    title: String, 
+    onClick: () -> Unit = {},
+    showChevron: Boolean = true,
+    textColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface
+) {
     Surface(
-        onClick = { /* TODO */ },
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         color = androidx.compose.ui.graphics.Color.Transparent
     ) {
@@ -615,13 +807,20 @@ fun SettingsNavigationItem(title: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Icon(
-                painter = painterResource(R.drawable.ic_return), // Reuse return icon as chevron
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.outline
+            Text(
+                title, 
+                style = MaterialTheme.typography.bodyLarge, 
+                fontWeight = FontWeight.Medium,
+                color = textColor
             )
+            if (showChevron) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_return), // Reuse return icon as chevron
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+            }
         }
     }
 }
