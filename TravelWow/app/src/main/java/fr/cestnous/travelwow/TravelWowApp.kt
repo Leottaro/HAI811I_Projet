@@ -96,6 +96,7 @@ fun TravelWowApp(
     var postDescription by remember { mutableStateOf("") }
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
     var isSavingPost by remember { mutableStateOf(false) }
+    var showPostSuccessDialog by remember { mutableStateOf(false) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -189,38 +190,42 @@ fun TravelWowApp(
                                 currentStepImages = emptyList()
                             },
                             canConfirmStep = currentStepName.isNotBlank(),
-                            canShare = postTitle.isNotBlank() && postLocation.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost && !showAddStep,
+                            canShare = postTitle.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost && !showAddStep,
                             onShareClick = {
                                 isSavingPost = true
                                 coroutineScope.launch {
                                     try {
-                                        val post = hashMapOf(
-                                            "userId" to user.uid,
-                                            "authorName" to effectiveUsername,
-                                            "title" to postTitle,
-                                            "location" to postLocation,
-                                            "description" to postDescription,
-                                            "steps" to postSteps.map { step ->
-                                                mapOf(
-                                                    "id" to step.id,
-                                                    "name" to step.name,
-                                                    "latitude" to step.latitude,
-                                                    "longitude" to step.longitude,
-                                                    "images" to step.images
-                                                )
-                                            },
-                                            "timestamp" to com.google.firebase.Timestamp.now()
+                                        val firebaseSteps = postSteps.mapIndexed { index, step ->
+                                            FirebaseStep(
+                                                id = step.id,
+                                                name = step.name,
+                                                latitude = step.latitude,
+                                                longitude = step.longitude,
+                                                imageUrls = step.images,
+                                                order = index
+                                            )
+                                        }
+
+                                        val post = FirebasePost(
+                                            authorId = user.uid,
+                                            authorName = effectiveUsername,
+                                            authorPhotoUrl = profilePhotoUri,
+                                            title = postTitle,
+                                            locationName = firebaseSteps.firstOrNull()?.name ?: "Lieu inconnu",
+                                            description = postDescription,
+                                            steps = firebaseSteps,
+                                            mainImageUrl = firebaseSteps.firstOrNull()?.imageUrls?.firstOrNull()
                                         )
                                         
                                         db.collection("posts").add(post).await()
                                         
+                                        showPostSuccessDialog = true
                                         showCreatePost = false
                                         postTitle = ""
                                         postLocation = ""
                                         postDescription = ""
                                         postSteps = emptyList()
                                     } catch (e: Exception) {
-                                        // TODO: Show error message
                                         e.printStackTrace()
                                     } finally {
                                         isSavingPost = false
@@ -409,6 +414,10 @@ fun TravelWowApp(
                     onDismissRequest = { showBottomSheet = false },
                     sheetState = sheetState
                 )
+            }
+
+            if (showPostSuccessDialog) {
+                PostSuccessDialog(onDismiss = { showPostSuccessDialog = false })
             }
         }
     }

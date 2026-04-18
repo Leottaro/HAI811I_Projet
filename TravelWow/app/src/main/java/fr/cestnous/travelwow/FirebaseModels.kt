@@ -46,11 +46,9 @@ data class FirebasePost(
     val durationMinutes: Int = 0,
     val likesCount: Int = 0,
     val commentsCount: Int = 0,
+    val steps: List<FirebaseStep> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
-    val tags: List<String> = emptyList(),
-    // Steps are usually stored in a sub-collection for better scalability,
-    // but can be embedded if they are few and small.
-    // For now, let's keep them as a sub-collection concept.
+    val tags: List<String> = emptyList()
 )
 
 /**
