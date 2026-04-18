@@ -246,6 +246,7 @@ fun TravelWowApp(
                                             steps = postSteps,
                                             onAddStepClick = { showAddStep = true },
                                             onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
+                                            onStepsChange = { postSteps = it },
                                             modifier = Modifier
                                         )
                                     } else {

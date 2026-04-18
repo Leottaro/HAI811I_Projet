@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -72,74 +73,157 @@ fun CreatePostContent(
     steps: List<TravelStep>,
     onAddStepClick: () -> Unit,
     onRemoveStep: (TravelStep) -> Unit,
+    onStepsChange: (List<TravelStep>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    var draggedStepId by remember { mutableStateOf<String?>(null) }
+    var initialDragIndex by remember { mutableIntStateOf(-1) }
+    var totalDragOffset by remember { mutableFloatStateOf(0f) }
+    val snapBackOffset = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    val density = LocalDensity.current
+    // Approximate height for reordering logic
+    val itemHeightPx = with(density) { 140.dp.toPx() } 
+
+    val currentStepsList by rememberUpdatedState(steps)
+
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Title and Location
-        OutlinedTextField(
-            value = title,
-            onValueChange = onTitleChange,
-            label = { Text("Titre du parcours") },
-            placeholder = { Text("Ex: Randonnée au Pic Saint-Loup") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                // Title and Location
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = onTitleChange,
+                    label = { Text("Titre du parcours") },
+                    placeholder = { Text("Ex: Randonnée au Pic Saint-Loup") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
 
-        OutlinedTextField(
-            value = description,
-            onValueChange = onDescriptionChange,
-            label = { Text("Description") },
-            placeholder = { Text("Racontez votre expérience...") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp),
-            shape = RoundedCornerShape(12.dp)
-        )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    label = { Text("Description") },
+                    placeholder = { Text("Racontez votre expérience...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    shape = RoundedCornerShape(12.dp)
+                )
 
-        // Itinerary / Steps Section
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Étapes du parcours",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "${steps.size} étape(s)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
-        
-        // List of added steps
-        steps.forEach { step ->
-            StepItem(step = step, onRemove = { onRemoveStep(step) })
+                // Itinerary / Steps Section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Étapes du parcours",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${steps.size} étape(s)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
         }
 
-        Button(
-            onClick = onAddStepClick,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(painterResource(R.drawable.ic_pin), contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Ajouter une étape avec photos")
+        itemsIndexed(currentStepsList, key = { _, step -> step.id }) { index, step ->
+            val isDragging = draggedStepId == step.id
+            val scale by animateFloatAsState(if (isDragging) 1.05f else 1f, label = "scale")
+            
+            val translationY = if (isDragging) {
+                totalDragOffset - (index - initialDragIndex) * itemHeightPx
+            } else {
+                snapBackOffset.value
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(if (isDragging) 10f else 1f)
+                    .then(if (isDragging) Modifier else Modifier.animateItem())
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.translationY = translationY
+                    }
+                    .pointerInput(step.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                draggedStepId = step.id
+                                initialDragIndex = index
+                                totalDragOffset = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                totalDragOffset += dragAmount.y
+
+                                val list = currentStepsList
+                                val currentIdx = list.indexOfFirst { it.id == draggedStepId }
+                                if (currentIdx != -1) {
+                                    val targetIdx = (initialDragIndex + (totalDragOffset / itemHeightPx).roundToInt())
+                                        .coerceIn(0, list.size - 1)
+
+                                    if (targetIdx != currentIdx) {
+                                        val nextIdx = if (targetIdx > currentIdx) currentIdx + 1 else currentIdx - 1
+                                        val newList = list.toMutableList()
+                                        Collections.swap(newList, currentIdx, nextIdx)
+                                        onStepsChange(newList)
+                                    }
+                                }
+                            },
+                            onDragEnd = {
+                                coroutineScope.launch {
+                                    val currentIdx = currentStepsList.indexOfFirst { it.id == draggedStepId }
+                                    if (currentIdx != -1) {
+                                        val finalOffset = totalDragOffset - (currentIdx - initialDragIndex) * itemHeightPx
+                                        snapBackOffset.snapTo(finalOffset)
+                                    }
+                                    draggedStepId = null
+                                    totalDragOffset = 0f
+                                    snapBackOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                }
+                            },
+                            onDragCancel = {
+                                draggedStepId = null
+                                totalDragOffset = 0f
+                            }
+                        )
+                    }
+            ) {
+                StepItem(step = step, onRemove = { onRemoveStep(step) })
+            }
         }
-        
-        Spacer(modifier = Modifier.height(20.dp))
+
+        item {
+            Column {
+                Button(
+                    onClick = onAddStepClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(painterResource(R.drawable.ic_pin), contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ajouter une étape avec photos")
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+        }
     }
 }
 
