@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +57,10 @@ fun TravelWowApp(
     var postLocation by remember { mutableStateOf("") }
     var postDescription by remember { mutableStateOf("") }
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
+    var isSavingPost by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val db = remember { Firebase.firestore }
     
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
@@ -113,14 +121,43 @@ fun TravelWowApp(
                                 }
                             },
                             isAdding = showCreatePost,
-                            canShare = postTitle.isNotBlank() && postDescription.isNotBlank() && postSteps.isNotEmpty(),
+                            canShare = postTitle.isNotBlank() && postLocation.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost,
                             onShareClick = {
-                                // TODO: Firebase save logic
-                                showCreatePost = false
-                                postTitle = ""
-                                postLocation = ""
-                                postDescription = ""
-                                postSteps = emptyList()
+                                isSavingPost = true
+                                coroutineScope.launch {
+                                    try {
+                                        val post = hashMapOf(
+                                            "userId" to user.uid,
+                                            "authorName" to effectiveUsername,
+                                            "title" to postTitle,
+                                            "location" to postLocation,
+                                            "description" to postDescription,
+                                            "steps" to postSteps.map { step ->
+                                                mapOf(
+                                                    "id" to step.id,
+                                                    "name" to step.name,
+                                                    "latitude" to step.latitude,
+                                                    "longitude" to step.longitude,
+                                                    "images" to step.images
+                                                )
+                                            },
+                                            "timestamp" to com.google.firebase.Timestamp.now()
+                                        )
+                                        
+                                        db.collection("posts").add(post).await()
+                                        
+                                        showCreatePost = false
+                                        postTitle = ""
+                                        postLocation = ""
+                                        postDescription = ""
+                                        postSteps = emptyList()
+                                    } catch (e: Exception) {
+                                        // TODO: Show error message
+                                        e.printStackTrace()
+                                    } finally {
+                                        isSavingPost = false
+                                    }
+                                }
                             },
                             viewMode = galleryViewMode,
                             onViewModeChange = { galleryViewMode = it }
