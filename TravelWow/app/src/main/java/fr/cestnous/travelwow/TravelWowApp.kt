@@ -2,10 +2,6 @@ package fr.cestnous.travelwow
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +40,7 @@ fun TravelWowApp(
     var customUsername by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
     
-    val effectiveUsername = if (customUsername.isNotBlank()) customUsername else username
+    val effectiveUsername = customUsername.ifBlank { username }
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<Int?>(null) }
@@ -117,7 +113,7 @@ fun TravelWowApp(
                                 }
                             },
                             isAdding = showCreatePost,
-                            canShare = postTitle.isNotBlank() && postDescription.isNotBlank(),
+                            canShare = postTitle.isNotBlank() && postDescription.isNotBlank() && postSteps.isNotEmpty(),
                             onShareClick = {
                                 // TODO: Firebase save logic
                                 showCreatePost = false
@@ -180,7 +176,6 @@ fun TravelWowApp(
                                         steps = postSteps,
                                         onAddStep = { postSteps = postSteps + it },
                                         onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
-                                        selectedImages = emptyList(),
                                         modifier = Modifier.padding(innerPadding)
                                     )
                                 } else {
@@ -535,7 +530,12 @@ fun SettingsToggleItem(title: String, description: String, initialValue: Boolean
         Switch(
             checked = checked, 
             onCheckedChange = { checked = it },
-            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         )
     }
 }
@@ -561,12 +561,4 @@ fun SettingsNavigationItem(title: String) {
             )
         }
     }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Bienvenue, $name!",
-        modifier = modifier.padding(16.dp)
-    )
 }

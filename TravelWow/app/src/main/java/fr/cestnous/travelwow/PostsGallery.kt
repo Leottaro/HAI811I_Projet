@@ -14,6 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
 
 enum class GalleryViewMode {
     GRID, MAP
@@ -81,37 +84,31 @@ fun PostMap(
     onItemClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Placeholder for Interactive Map (Google Maps / OSM)
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)),
-        contentAlignment = Alignment.Center
+    val montpellier = LatLng(43.6107, 3.8767)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(montpellier, 12f)
+    }
+
+    // Mock data for markers
+    val mockLocations = listOf(
+        LatLng(43.6107, 3.8767) to "Parcours 1",
+        LatLng(43.6150, 3.8700) to "Parcours 2",
+        LatLng(43.6000, 3.8900) to "Parcours 3"
+    )
+
+    GoogleMap(
+        modifier = modifier.fillMaxSize(),
+        cameraPositionState = cameraPositionState
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                painter = painterResource(R.drawable.ic_map),
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
+        mockLocations.forEachIndexed { index, (location, title) ->
+            Marker(
+                state = MarkerState(position = location),
+                title = title,
+                onClick = {
+                    onItemClick(index)
+                    false
+                }
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "Carte Interactive",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                "Les parcours s'afficheront ici sur la carte",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-            )
-            
-            // Mock buttons to simulate clicking a pin on the map
-            Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onItemClick(1) }) { Text("Parcours 1") }
-                Button(onClick = { onItemClick(2) }) { Text("Parcours 2") }
-            }
         }
     }
 }

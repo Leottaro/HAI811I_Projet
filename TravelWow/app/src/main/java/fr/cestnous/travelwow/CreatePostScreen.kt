@@ -1,11 +1,15 @@
 package fr.cestnous.travelwow
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,12 +26,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
 
 data class TravelStep(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val images: List<String> = emptyList()
 )
 
 @Composable
@@ -41,7 +50,6 @@ fun CreatePostContent(
     steps: List<TravelStep>,
     onAddStep: (TravelStep) -> Unit,
     onRemoveStep: (TravelStep) -> Unit,
-    selectedImages: List<String>,
     modifier: Modifier = Modifier
 ) {
     var showAddStepDialog by remember { mutableStateOf(false) }
@@ -63,43 +71,6 @@ fun CreatePostContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // ... (Photos Section remains the same)
-        Text(
-            text = "Photos",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { /* TODO: Image Picker */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Ajouter une photo",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            items(selectedImages) { imageUri ->
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-        }
-
         // Title and Location
         OutlinedTextField(
             value = title,
@@ -167,7 +138,7 @@ fun CreatePostContent(
         ) {
             Icon(painterResource(R.drawable.ic_pin), contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Ajouter une étape GPS")
+            Text("Ajouter une étape avec photos")
         }
         
         Spacer(modifier = Modifier.height(20.dp))
@@ -181,29 +152,45 @@ fun StepItem(step: TravelStep, onRemove: () -> Unit) {
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_pin),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                Text(
-                    text = "Lat: ${"%.4f".format(step.latitude)}, Lon: ${"%.4f".format(step.longitude)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_pin),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "Lat: ${"%.4f".format(step.latitude)}, Lon: ${"%.4f".format(step.longitude)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Close, contentDescription = "Supprimer", modifier = Modifier.size(20.dp))
+                }
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Close, contentDescription = "Supprimer", modifier = Modifier.size(20.dp))
+            
+            if (step.images.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(step.images) { imageUri ->
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
             }
         }
     }
@@ -215,16 +202,26 @@ fun AddStepDialog(
     onStepAdded: (TravelStep) -> Unit
 ) {
     var stepName by remember { mutableStateOf("") }
-    // In a real app, these would come from a Map picker
-    val mockLat = remember { (43..45).random() + Math.random() }
-    val mockLon = remember { (3..5).random() + Math.random() }
+    var stepImages by remember { mutableStateOf(emptyList<String>()) }
+    
+    // Default position (e.g., Montpellier)
+    var selectedLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(selectedLocation, 12f)
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        onResult = { uris ->
+            stepImages = stepImages + uris.map { it.toString() }
+        }
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nouvelle étape") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Entrez le nom de l'étape. La position GPS sera récupérée via la carte.")
                 OutlinedTextField(
                     value = stepName,
                     onValueChange = { stepName = it },
@@ -232,26 +229,90 @@ fun AddStepDialog(
                     placeholder = { Text("Ex: Belvédère") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                Text("Photos de cette étape", style = MaterialTheme.typography.labelLarge)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Ajouter des photos")
+                        }
+                    }
+                    items(stepImages) { imageUri ->
+                        Box(modifier = Modifier.size(80.dp)) {
+                            AsyncImage(
+                                model = imageUri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = { stepImages = stepImages.filter { it != imageUri } },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(20.dp)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Supprimer", tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
+                        }
+                    }
+                }
+
+                Text("Position GPS (cliquez sur la carte)", style = MaterialTheme.typography.labelLarge)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(painterResource(R.drawable.ic_map), contentDescription = null, modifier = Modifier.size(40.dp))
-                        Text("Simulateur de Carte", style = MaterialTheme.typography.labelMedium)
-                        Text("Position: ${"%.4f".format(mockLat)}, ${"%.4f".format(mockLon)}", style = MaterialTheme.typography.labelSmall)
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = cameraPositionState,
+                        onMapClick = { latLng ->
+                            selectedLocation = latLng
+                        }
+                    ) {
+                        Marker(
+                            state = MarkerState(position = selectedLocation),
+                            title = stepName.ifBlank { "Nouvelle étape" }
+                        )
                     }
                 }
+                
+                Text(
+                    text = "Lat: ${"%.4f".format(selectedLocation.latitude)}, Lon: ${"%.4f".format(selectedLocation.longitude)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         },
         confirmButton = {
             Button(
+                enabled = stepImages.isNotEmpty(),
                 onClick = {
-                    onStepAdded(TravelStep(name = stepName.ifBlank { "Étape sans nom" }, latitude = mockLat, longitude = mockLon))
+                    onStepAdded(TravelStep(
+                        name = stepName.ifBlank { "Étape sans nom" }, 
+                        latitude = selectedLocation.latitude, 
+                        longitude = selectedLocation.longitude,
+                        images = stepImages
+                    ))
                 }
             ) {
                 Text("Ajouter")

@@ -2,11 +2,14 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
 }
 
 android {
     namespace = "fr.cestnous.travelwow"
     compileSdk = 36
+
+    useLibrary("org.apache.http.legacy")
 
     defaultConfig {
         applicationId = "fr.cestnous.travelwow"
@@ -33,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -59,4 +63,6 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.coil.compose)
+    implementation(libs.maps.compose)
+    implementation(libs.play.services.maps)
 }
