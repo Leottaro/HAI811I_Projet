@@ -18,8 +18,8 @@ import fr.cestnous.travelwow.ui.theme.TravelWowTheme
 @Composable
 fun SearchTopBar(
     modifier: Modifier = Modifier,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onAddClick: () -> Unit,
     isAdding: Boolean = false,
     isAddingStep: Boolean = false,

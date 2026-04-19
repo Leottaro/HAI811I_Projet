@@ -1,5 +1,6 @@
 package fr.cestnous.travelwow
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,18 +50,28 @@ fun PostsGallery(
         coroutineScope.launch {
             isRefreshing = true
             try {
-                // Fetch posts ordered by creation date
-                var query = db.collection("travelpath").document("posts").collection("posts")
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
+                Log.d("PostsGallery", "Fetching posts...")
+                // Fetch posts
+                val baseQuery = db.collection("travelpath_posts")
                 
-                if (userIdFilter != null) {
-                    query = query.whereEqualTo("authorId", userIdFilter)
+                val query: Query = if (userIdFilter != null) {
+                    Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
+                    baseQuery.whereEqualTo("authorId", userIdFilter)
+                } else {
+                    // Try to fetch without ordering first to see if it's an index/field issue
+                    baseQuery
                 }
 
                 val snapshot = query.limit(50).get().await()
+                Log.d("PostsGallery", "Snapshot received with ${snapshot.size()} documents")
+                var fetchedPosts = snapshot.toObjects(FirebasePost::class.java)
                 
-                posts = snapshot.toObjects(FirebasePost::class.java)
+                // Sort in memory to avoid index requirements for now
+                fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
+                
+                posts = fetchedPosts
             } catch (e: Exception) {
+                Log.e("PostsGallery", "Error fetching posts", e)
                 e.printStackTrace()
             } finally {
                 isRefreshing = false
@@ -84,7 +95,8 @@ fun PostsGallery(
             GalleryViewMode.GRID -> {
                 PostGrid(
                     posts = posts,
-                    onPostClick = onPostClick
+                    onPostClick = onPostClick,
+                    isLoading = isRefreshing
                 )
             }
             GalleryViewMode.MAP -> {
@@ -101,11 +113,29 @@ fun PostsGallery(
 fun PostGrid(
     posts: List<FirebasePost>,
     onPostClick: (FirebasePost) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
 ) {
-    if (posts.isEmpty()) {
+    if (isLoading && posts.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(modifier = Modifier.size(48.dp))
+        }
+    } else if (posts.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_map),
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Aucune publication trouvée",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
         }
     } else {
         LazyVerticalGrid(

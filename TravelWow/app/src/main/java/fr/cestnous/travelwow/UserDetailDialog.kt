@@ -25,15 +25,14 @@ fun UserDetailDialog(
     onDismiss: () -> Unit
 ) {
     var userDetails by remember { mutableStateOf<fr.cestnous.travelwow.FirebaseUser?>(null) }
+    var userPostCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(userId) {
         try {
-            Log.d("UserDetailDialog", "Fetching user from path: travelpath/users/users/$userId")
-            val doc = Firebase.firestore
-                .collection("travelpath")
-                .document("users")
-                .collection("users")
+            Log.d("UserDetailDialog", "Fetching user from path: travelpath/$userId")
+            val db = Firebase.firestore
+            val doc = db.collection("travelpath")
                 .document(userId)
                 .get()
                 .await()
@@ -43,6 +42,13 @@ fun UserDetailDialog(
             } else {
                 Log.d("UserDetailDialog", "No document found for userId: $userId")
             }
+
+            // Fetch post count
+            val countSnapshot = db.collection("travelpath_posts")
+                .whereEqualTo("authorId", userId)
+                .get()
+                .await()
+            userPostCount = countSnapshot.size()
         } catch (e: Exception) {
             Log.e("UserDetailDialog", "Error fetching user details", e)
             e.printStackTrace()
@@ -140,7 +146,7 @@ fun UserDetailDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        UserStatItem(label = "Publications", value = "0") // TODO: Fetch post count
+                        UserStatItem(label = "Publications", value = userPostCount.toString())
                         UserStatItem(label = "Abonnés", value = userDetails?.followersCount?.toString() ?: "0")
                         UserStatItem(label = "Abonnements", value = userDetails?.followingCount?.toString() ?: "0")
                     }

@@ -47,14 +47,17 @@ fun TravelWowApp(
     var customUsername by rememberSaveable { mutableStateOf("") }
     var profilePhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
     var userSettings by remember { mutableStateOf(FirebaseUserSettings()) }
+    var userPostCount by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
     val db = remember { Firebase.firestore }
+    val storage = remember { Firebase.storage("gs://travelapp-4a34b.firebasestorage.app") }
 
-    // Load user profile from Firestore
+    // Load user profile and post count from Firestore
     LaunchedEffect(user.uid) {
         try {
-            val doc = db.collection("travelpath").document("users").collection("users").document(user.uid).get().await()
+            // Load Profile
+            val doc = db.collection("travelpath").document(user.uid).get().await()
             if (doc.exists()) {
                 val profile = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
                 profile?.let {
@@ -74,11 +77,18 @@ fun TravelWowApp(
                     email = user.email ?: "",
                     bio = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾"
                 )
-                db.collection("travelpath").document("users").collection("users").document(user.uid).set(initialProfile).await()
+                db.collection("travelpath").document(user.uid).set(initialProfile).await()
                 customUsername = initialProfile.username
                 userBio = initialProfile.bio
                 userSettings = initialProfile.settings
             }
+
+            // Load Post Count
+            val countSnapshot = db.collection("travelpath_posts")
+                .whereEqualTo("authorId", user.uid)
+                .get()
+                .await()
+            userPostCount = countSnapshot.size()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -86,7 +96,6 @@ fun TravelWowApp(
     
     val effectiveUsername = customUsername.ifBlank { username }
 
-    var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
@@ -162,8 +171,6 @@ fun TravelWowApp(
                         when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
                             modifier = Modifier,
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { searchQuery = it },
                             onAddClick = { showCreatePost = true },
                             onResetPost = {
                                 // Reset and close
@@ -202,9 +209,12 @@ fun TravelWowApp(
                                         val firebaseSteps = postSteps.mapIndexed { index, step ->
                                             val stepImageUrls = step.images.mapIndexed { imgIndex, uri ->
                                                 if (uri.startsWith("content://") || uri.startsWith("file://")) {
-                                                    val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("posts/${user.uid}/${step.id}/image_$imgIndex.jpg")
+                                                    Log.d("TravelWowApp", "Uploading step image $imgIndex for step ${step.id}...")
+                                                    val storageRef = storage.reference.child("posts/${user.uid}/${step.id}/image_$imgIndex.jpg")
                                                     storageRef.putFile(uri.toUri()).await()
-                                                    storageRef.downloadUrl.await().toString()
+                                                    val downloadUrl = storageRef.downloadUrl.await().toString()
+                                                    Log.d("TravelWowApp", "Step image $imgIndex uploaded: $downloadUrl")
+                                                    downloadUrl
                                                 } else {
                                                     uri
                                                 }
@@ -219,7 +229,7 @@ fun TravelWowApp(
                                             )
                                         }
 
-                                        val postRef = db.collection("travelpath").document("posts").collection("posts").document()
+                                        val postRef = db.collection("travelpath_posts").document()
                                         val postId = postRef.id
 
                                         val post = FirebasePost(
@@ -294,13 +304,13 @@ fun TravelWowApp(
                                 // Upload image if it's a local URI
                                 if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
                                     Log.d("TravelWowApp", "Uploading new profile picture...")
-                                    val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("users/${user.uid}/profile.jpg")
+                                    val storageRef = storage.reference.child("users/${user.uid}/profile.jpg")
                                     storageRef.putFile(newPhotoUri.toUri()).await()
                                     finalPhotoUrl = storageRef.downloadUrl.await().toString()
                                     Log.d("TravelWowApp", "Upload successful. New URL: $finalPhotoUrl")
                                 }
 
-                                val userRef = db.collection("travelpath").document("users").collection("users").document(user.uid)
+                                val userRef = db.collection("travelpath").document(user.uid)
                                 val updates = mutableMapOf<String, Any>(
                                     "username" to newName,
                                     "bio" to newBio
@@ -321,7 +331,7 @@ fun TravelWowApp(
                                 try {
                                     var finalPhotoUrl = newPhotoUri
                                     if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
-                                        val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("users/${user.uid}/profile.jpg")
+                                        val storageRef = storage.reference.child("users/${user.uid}/profile.jpg")
                                         storageRef.putFile(newPhotoUri.toUri()).await()
                                         finalPhotoUrl = storageRef.downloadUrl.await().toString()
                                     }
@@ -333,7 +343,7 @@ fun TravelWowApp(
                                         bio = newBio,
                                         photoUrl = finalPhotoUrl
                                     )
-                                    db.collection("travelpath").document("users").collection("users").document(user.uid).set(newUser).await()
+                                    db.collection("travelpath").document(user.uid).set(newUser).await()
                                     customUsername = newName
                                     userBio = newBio
                                     profilePhotoUri = finalPhotoUrl
@@ -359,7 +369,7 @@ fun TravelWowApp(
                     onSave = { newSettings ->
                         coroutineScope.launch {
                             try {
-                                db.collection("travelpath").document("users").collection("users").document(user.uid)
+                                db.collection("travelpath").document(user.uid)
                                     .update("settings", newSettings)
                                     .await()
                                 userSettings = newSettings
@@ -426,6 +436,7 @@ fun TravelWowApp(
                                             username = effectiveUsername,
                                             bio = userBio,
                                             photoUri = profilePhotoUri,
+                                            postsCount = userPostCount,
                                             viewMode = galleryViewMode,
                                             onViewModeChange = { galleryViewMode = it },
                                             onSettingsClick = { showSettings = true },

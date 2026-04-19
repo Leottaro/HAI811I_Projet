@@ -53,8 +53,7 @@ fun DetailsBottomSheet(
     LaunchedEffect(post?.id) {
         if (post != null) {
             try {
-                val snapshot = db.collection("travelpath").document("posts")
-                    .collection("posts").document(post.id)
+                val snapshot = db.collection("travelpath_posts").document(post.id)
                     .collection("steps")
                     .orderBy("order")
                     .get()
