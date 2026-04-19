@@ -35,10 +35,10 @@ enum class GalleryViewMode {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostsGallery(
-    selectedItem: Int?,
-    onItemClick: (Int) -> Unit,
+    onPostClick: (FirebasePost) -> Unit,
     viewMode: GalleryViewMode,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    userIdFilter: String? = null
 ) {
     val db = remember { Firebase.firestore }
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
@@ -50,11 +50,14 @@ fun PostsGallery(
             isRefreshing = true
             try {
                 // Fetch posts ordered by creation date
-                val snapshot = db.collection("posts")
+                var query = db.collection("travelpath").document("posts").collection("posts")
                     .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .limit(50)
-                    .get()
-                    .await()
+                
+                if (userIdFilter != null) {
+                    query = query.whereEqualTo("authorId", userIdFilter)
+                }
+
+                val snapshot = query.limit(50).get().await()
                 
                 posts = snapshot.toObjects(FirebasePost::class.java)
             } catch (e: Exception) {
@@ -81,14 +84,13 @@ fun PostsGallery(
             GalleryViewMode.GRID -> {
                 PostGrid(
                     posts = posts,
-                    selectedItem = selectedItem,
-                    onItemClick = onItemClick
+                    onPostClick = onPostClick
                 )
             }
             GalleryViewMode.MAP -> {
                 PostMap(
                     posts = posts,
-                    onItemClick = onItemClick
+                    onPostClick = onPostClick
                 )
             }
         }
@@ -98,8 +100,7 @@ fun PostsGallery(
 @Composable
 fun PostGrid(
     posts: List<FirebasePost>,
-    selectedItem: Int?,
-    onItemClick: (Int) -> Unit,
+    onPostClick: (FirebasePost) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (posts.isEmpty()) {
@@ -114,21 +115,13 @@ fun PostGrid(
             verticalArrangement = Arrangement.spacedBy(1.dp),
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
-            itemsIndexed(posts, key = { _, post -> post.id }) { index, post ->
-                val isSelected = index == selectedItem
+            itemsIndexed(posts, key = { _, post -> post.id }) { _, post ->
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(4.dp, MaterialTheme.colorScheme.primary)
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .clickable { onItemClick(index) }
+                        .clickable { onPostClick(post) }
                 ) {
                     if (post.mainImageUrl != null) {
                         AsyncImage(
@@ -155,7 +148,7 @@ fun PostGrid(
 @Composable
 fun PostMap(
     posts: List<FirebasePost>,
-    onItemClick: (Int) -> Unit,
+    onPostClick: (FirebasePost) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val montpellier = LatLng(43.6107, 3.8767)
@@ -167,20 +160,16 @@ fun PostMap(
         modifier = modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState
     ) {
-        posts.forEachIndexed { index, post ->
-            // Use the first step's location for the marker
-            val firstStep = post.steps.firstOrNull()
-            if (firstStep != null) {
-                Marker(
-                    state = MarkerState(position = LatLng(firstStep.latitude, firstStep.longitude)),
-                    title = post.title,
-                    snippet = post.locationName,
-                    onClick = {
-                        onItemClick(index)
-                        false
-                    }
-                )
-            }
+        posts.forEach { post ->
+            Marker(
+                state = MarkerState(position = LatLng(post.latitude, post.longitude)),
+                title = post.title,
+                snippet = post.locationName,
+                onClick = {
+                    onPostClick(post)
+                    false
+                }
+            )
         }
     }
 }

@@ -1,5 +1,6 @@
 package fr.cestnous.travelwow
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,11 +29,22 @@ fun UserDetailDialog(
 
     LaunchedEffect(userId) {
         try {
-            val doc = Firebase.firestore.collection("users").document(userId).get().await()
+            Log.d("UserDetailDialog", "Fetching user from path: travelpath/users/users/$userId")
+            val doc = Firebase.firestore
+                .collection("travelpath")
+                .document("users")
+                .collection("users")
+                .document(userId)
+                .get()
+                .await()
             if (doc.exists()) {
                 userDetails = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
+                Log.d("UserDetailDialog", "User loaded: ${userDetails?.username}")
+            } else {
+                Log.d("UserDetailDialog", "No document found for userId: $userId")
             }
         } catch (e: Exception) {
+            Log.e("UserDetailDialog", "Error fetching user details", e)
             e.printStackTrace()
         } finally {
             isLoading = false
@@ -128,8 +140,28 @@ fun UserDetailDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
+                        UserStatItem(label = "Publications", value = "0") // TODO: Fetch post count
                         UserStatItem(label = "Abonnés", value = userDetails?.followersCount?.toString() ?: "0")
                         UserStatItem(label = "Abonnements", value = userDetails?.followingCount?.toString() ?: "0")
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // User's Posts
+                    Text(
+                        text = "Publications",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
+                        PostsGallery(
+                            onPostClick = { /* Maybe show detail? */ },
+                            viewMode = GalleryViewMode.GRID,
+                            modifier = Modifier.fillMaxSize(),
+                            userIdFilter = userId
+                        )
                     }
                 }
             } else {

@@ -42,11 +42,13 @@ data class FirebasePost(
     val locationName: String = "",
     val description: String = "",
     val mainImageUrl: String? = null,
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
     val distanceKm: Double = 0.0,
     val durationMinutes: Int = 0,
     val likesCount: Int = 0,
     val commentsCount: Int = 0,
-    val steps: List<FirebaseStep> = emptyList(),
+    @get:com.google.firebase.firestore.Exclude val steps: List<FirebaseStep> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
     val tags: List<String> = emptyList()
 )

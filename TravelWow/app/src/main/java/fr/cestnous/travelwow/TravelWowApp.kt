@@ -1,5 +1,6 @@
 package fr.cestnous.travelwow
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,9 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.core.net.toUri
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -51,7 +54,7 @@ fun TravelWowApp(
     // Load user profile from Firestore
     LaunchedEffect(user.uid) {
         try {
-            val doc = db.collection("users").document(user.uid).get().await()
+            val doc = db.collection("travelpath").document("users").collection("users").document(user.uid).get().await()
             if (doc.exists()) {
                 val profile = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
                 profile?.let {
@@ -71,7 +74,7 @@ fun TravelWowApp(
                     email = user.email ?: "",
                     bio = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾"
                 )
-                db.collection("users").document(user.uid).set(initialProfile).await()
+                db.collection("travelpath").document("users").collection("users").document(user.uid).set(initialProfile).await()
                 customUsername = initialProfile.username
                 userBio = initialProfile.bio
                 userSettings = initialProfile.settings
@@ -84,7 +87,7 @@ fun TravelWowApp(
     val effectiveUsername = customUsername.ifBlank { username }
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var selectedItem by remember { mutableStateOf<Int?>(null) }
+    var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
     
@@ -158,6 +161,7 @@ fun TravelWowApp(
                 if (!showSettings && !showEditProfile) {
                         when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
+                            modifier = Modifier,
                             searchQuery = searchQuery,
                             onSearchQueryChange = { searchQuery = it },
                             onAddClick = { showCreatePost = true },
@@ -196,28 +200,48 @@ fun TravelWowApp(
                                 coroutineScope.launch {
                                     try {
                                         val firebaseSteps = postSteps.mapIndexed { index, step ->
+                                            val stepImageUrls = step.images.mapIndexed { imgIndex, uri ->
+                                                if (uri.startsWith("content://") || uri.startsWith("file://")) {
+                                                    val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("posts/${user.uid}/${step.id}/image_$imgIndex.jpg")
+                                                    storageRef.putFile(uri.toUri()).await()
+                                                    storageRef.downloadUrl.await().toString()
+                                                } else {
+                                                    uri
+                                                }
+                                            }
                                             FirebaseStep(
                                                 id = step.id,
                                                 name = step.name,
                                                 latitude = step.latitude,
                                                 longitude = step.longitude,
-                                                imageUrls = step.images,
+                                                imageUrls = stepImageUrls,
                                                 order = index
                                             )
                                         }
 
+                                        val postRef = db.collection("travelpath").document("posts").collection("posts").document()
+                                        val postId = postRef.id
+
                                         val post = FirebasePost(
+                                            id = postId,
                                             authorId = user.uid,
                                             authorName = effectiveUsername,
                                             authorPhotoUrl = profilePhotoUri,
                                             title = postTitle,
                                             locationName = firebaseSteps.firstOrNull()?.name ?: "Lieu inconnu",
                                             description = postDescription,
-                                            steps = firebaseSteps,
-                                            mainImageUrl = firebaseSteps.firstOrNull()?.imageUrls?.firstOrNull()
+                                            mainImageUrl = firebaseSteps.firstOrNull()?.imageUrls?.firstOrNull(),
+                                            latitude = firebaseSteps.firstOrNull()?.latitude ?: 0.0,
+                                            longitude = firebaseSteps.firstOrNull()?.longitude ?: 0.0
                                         )
                                         
-                                        db.collection("posts").add(post).await()
+                                        postRef.set(post).await()
+
+                                        // Save steps to sub-collection
+                                        val stepsCollection = postRef.collection("steps")
+                                        firebaseSteps.forEach { firebaseStep ->
+                                            stepsCollection.document(firebaseStep.id).set(firebaseStep).await()
+                                        }
                                         
                                         showPostSuccessDialog = true
                                         showCreatePost = false
@@ -264,36 +288,58 @@ fun TravelWowApp(
                     onSave = { newName, newBio, newPhotoUri ->
                         coroutineScope.launch {
                             try {
-                                val userRef = db.collection("users").document(user.uid)
+                                Log.d("TravelWowApp", "Saving profile. Photo URI: $newPhotoUri")
+                                var finalPhotoUrl = newPhotoUri
+                                
+                                // Upload image if it's a local URI
+                                if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
+                                    Log.d("TravelWowApp", "Uploading new profile picture...")
+                                    val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("users/${user.uid}/profile.jpg")
+                                    storageRef.putFile(newPhotoUri.toUri()).await()
+                                    finalPhotoUrl = storageRef.downloadUrl.await().toString()
+                                    Log.d("TravelWowApp", "Upload successful. New URL: $finalPhotoUrl")
+                                }
+
+                                val userRef = db.collection("travelpath").document("users").collection("users").document(user.uid)
                                 val updates = mutableMapOf<String, Any>(
                                     "username" to newName,
                                     "bio" to newBio
                                 )
-                                newPhotoUri?.let { updates["photoUrl"] = it }
+                                finalPhotoUrl?.let { updates["photoUrl"] = it }
                                 
                                 userRef.update(updates).await()
+                                Log.d("TravelWowApp", "Firestore update successful")
                                 
                                 customUsername = newName
                                 userBio = newBio
-                                profilePhotoUri = newPhotoUri
+                                profilePhotoUri = finalPhotoUrl
                                 showEditProfile = false
                             } catch (e: Exception) {
+                                Log.e("TravelWowApp", "Error saving profile", e)
                                 e.printStackTrace()
-                                // Fallback if update fails (e.g. document doesn't exist)
+                                // Fallback logic remains
                                 try {
+                                    var finalPhotoUrl = newPhotoUri
+                                    if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
+                                        val storageRef = Firebase.storage("gs://travelapp-4a34b.firebasestorage.app").reference.child("users/${user.uid}/profile.jpg")
+                                        storageRef.putFile(newPhotoUri.toUri()).await()
+                                        finalPhotoUrl = storageRef.downloadUrl.await().toString()
+                                    }
+
                                     val newUser = fr.cestnous.travelwow.FirebaseUser(
                                         id = user.uid,
                                         username = newName,
                                         email = user.email ?: "",
                                         bio = newBio,
-                                        photoUrl = newPhotoUri
+                                        photoUrl = finalPhotoUrl
                                     )
-                                    db.collection("users").document(user.uid).set(newUser).await()
+                                    db.collection("travelpath").document("users").collection("users").document(user.uid).set(newUser).await()
                                     customUsername = newName
                                     userBio = newBio
-                                    profilePhotoUri = newPhotoUri
+                                    profilePhotoUri = finalPhotoUrl
                                     showEditProfile = false
                                 } catch (e2: Exception) {
+                                    Log.e("TravelWowApp", "Error in fallback save", e2)
                                     e2.printStackTrace()
                                 }
                             }
@@ -313,7 +359,7 @@ fun TravelWowApp(
                     onSave = { newSettings ->
                         coroutineScope.launch {
                             try {
-                                db.collection("users").document(user.uid)
+                                db.collection("travelpath").document("users").collection("users").document(user.uid)
                                     .update("settings", newSettings)
                                     .await()
                                 userSettings = newSettings
@@ -355,9 +401,8 @@ fun TravelWowApp(
                                         )
                                     } else {
                                         SearchScreen(
-                                            selectedItem = if (showBottomSheet) selectedItem else null,
-                                            onItemClick = { index ->
-                                                selectedItem = index
+                                            onPostClick = { post ->
+                                                selectedPost = post
                                                 showBottomSheet = true
                                             },
                                             viewMode = galleryViewMode,
@@ -367,9 +412,8 @@ fun TravelWowApp(
                                 }
                                 AppDestinations.FAVORITES -> Box(modifier = Modifier.fillMaxSize()) {
                                     PostsGallery(
-                                        selectedItem = if (showBottomSheet) selectedItem else null,
-                                        onItemClick = { index ->
-                                            selectedItem = index
+                                        onPostClick = { post ->
+                                            selectedPost = post
                                             showBottomSheet = true
                                         },
                                         viewMode = galleryViewMode,
@@ -392,13 +436,13 @@ fun TravelWowApp(
                                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
                                         PostsGallery(
-                                            selectedItem = if (showBottomSheet) selectedItem else null,
-                                            onItemClick = { index ->
-                                                selectedItem = index
+                                            onPostClick = { post ->
+                                                selectedPost = post
                                                 showBottomSheet = true
                                             },
                                             viewMode = galleryViewMode,
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.weight(1f),
+                                            userIdFilter = user.uid
                                         )
                                     }
                                 }
@@ -410,8 +454,11 @@ fun TravelWowApp(
 
             if (showBottomSheet) {
                 DetailsBottomSheet(
-                    selectedItem = selectedItem,
-                    onDismissRequest = { showBottomSheet = false },
+                    post = selectedPost,
+                    onDismissRequest = {
+                        showBottomSheet = false
+                        selectedPost = null
+                    },
                     sheetState = sheetState
                 )
             }
@@ -602,234 +649,3 @@ fun ProfileStat(label: String, value: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsScreen(
-    settings: FirebaseUserSettings,
-    userEmail: String,
-    onBack: () -> Unit,
-    onSave: (FirebaseUserSettings) -> Unit,
-    onLogout: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var currentSettings by remember { mutableStateOf(settings) }
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var showLogoutDialog by remember { mutableStateOf(false) }
-
-    if (showSaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showSaveDialog = false },
-            title = { Text("Enregistrer les préférences") },
-            text = { Text("Voulez-vous synchroniser ces paramètres avec votre compte Firebase ?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showSaveDialog = false
-                    onSave(currentSettings)
-                }) {
-                    Text("Confirmer", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSaveDialog = false }) {
-                    Text("Annuler")
-                }
-            }
-        )
-    }
-
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Déconnexion") },
-            text = { Text("Voulez-vous vraiment vous déconnecter de votre compte Firebase ?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showLogoutDialog = false
-                    onLogout()
-                }) {
-                    Text("Se déconnecter", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Annuler")
-                }
-            }
-        )
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Paramètres") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = { showSaveDialog = true }) {
-                        Text("Enregistrer", fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
-        },
-        modifier = modifier
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Préférences",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        SettingsToggleItem(
-                            title = "Publications des abonnés",
-                            description = "Nouveaux parcours de vos amis",
-                            checked = currentSettings.followersPostsNotifications,
-                            onCheckedChange = { currentSettings = currentSettings.copy(followersPostsNotifications = it) }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsToggleItem(
-                            title = "Likes sur vos posts",
-                            description = "Alertes pour les nouveaux likes",
-                            checked = currentSettings.likesNotifications,
-                            onCheckedChange = { currentSettings = currentSettings.copy(likesNotifications = it) }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsToggleItem(
-                            title = "Commentaires",
-                            description = "Notifications pour les messages",
-                            checked = currentSettings.commentsNotifications,
-                            onCheckedChange = { currentSettings = currentSettings.copy(commentsNotifications = it) }
-                        )
-                    }
-                }
-            }
-            
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Compte",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Column {
-                        SettingsNavigationItem(
-                            title = "Email : $userEmail",
-                            showChevron = false
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsNavigationItem(title = "Confidentialité")
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsNavigationItem(title = "Sécurité")
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsNavigationItem(
-                            title = "Déconnexion",
-                            onClick = { showLogoutDialog = true },
-                            textColor = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Text(
-                "TravelWow v1.0.0",
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
-    }
-}
-
-@Composable
-fun SettingsToggleItem(
-    title: String, 
-    description: String, 
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-        }
-        Switch(
-            checked = checked, 
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        )
-    }
-}
-
-@Composable
-fun SettingsNavigationItem(
-    title: String, 
-    onClick: () -> Unit = {},
-    showChevron: Boolean = true,
-    textColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        color = androidx.compose.ui.graphics.Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                title, 
-                style = MaterialTheme.typography.bodyLarge, 
-                fontWeight = FontWeight.Medium,
-                color = textColor
-            )
-            if (showChevron) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_return), // Reuse return icon as chevron
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.outline
-                )
-            }
-        }
-    }
-}

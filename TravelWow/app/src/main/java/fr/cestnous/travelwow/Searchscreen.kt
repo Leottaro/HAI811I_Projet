@@ -1,11 +1,6 @@
 package fr.cestnous.travelwow
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -22,6 +17,7 @@ import fr.cestnous.travelwow.ui.theme.TravelWowTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchTopBar(
+    modifier: Modifier = Modifier,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onAddClick: () -> Unit,
@@ -34,8 +30,7 @@ fun SearchTopBar(
     canShare: Boolean = false,
     viewMode: GalleryViewMode = GalleryViewMode.GRID,
     onViewModeChange: (GalleryViewMode) -> Unit = {},
-    onResetPost: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onResetPost: () -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -159,14 +154,12 @@ fun SearchTopBar(
 
 @Composable
 fun SearchScreen(
-    selectedItem: Int?,
-    onItemClick: (Int) -> Unit,
+    onPostClick: (FirebasePost) -> Unit,
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier
 ) {
     PostsGallery(
-        selectedItem = selectedItem,
-        onItemClick = onItemClick,
+        onPostClick = onPostClick,
         viewMode = viewMode,
         modifier = modifier
     )
@@ -178,7 +171,7 @@ fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
             SearchTopBar(searchQuery = "", onSearchQueryChange = {}, onAddClick = {}, viewMode = GalleryViewMode.GRID, onViewModeChange = {})
-            SearchScreen(selectedItem = null, onItemClick = {}, viewMode = GalleryViewMode.GRID)
+            SearchScreen(onPostClick = {}, viewMode = GalleryViewMode.GRID)
         }
     }
 }
