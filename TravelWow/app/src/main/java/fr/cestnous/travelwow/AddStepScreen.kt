@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -341,11 +342,19 @@ fun AddStepScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     items(currentPoiPhotos) { photoUrl ->
+                        val isSelected = stepImages.contains(photoUrl)
                         Box(
                             modifier = Modifier
                                 .size(100.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable {
+                                    if (isSelected) {
+                                        onStepImagesChange(stepImages - photoUrl)
+                                    } else {
+                                        onStepImagesChange(stepImages + photoUrl)
+                                    }
+                                }
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
@@ -356,11 +365,7 @@ fun AddStepScreen(
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clickable {
-                                        if (!stepImages.contains(photoUrl)) {
-                                            onStepImagesChange(stepImages + photoUrl)
-                                        }
-                                    },
+                                    .alpha(if (isSelected) 0.6f else 1f),
                                 contentScale = ContentScale.Crop,
                                 onError = { state ->
                                     Log.e("AddStepScreen", "AsyncImage error for $photoUrl: ${state.result.throwable}")
@@ -369,6 +374,23 @@ fun AddStepScreen(
                                     Log.d("AddStepScreen", "AsyncImage success for $photoUrl")
                                 }
                             )
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Sélectionné",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
