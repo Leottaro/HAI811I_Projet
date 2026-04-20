@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.Query
@@ -40,7 +41,9 @@ fun PostsGallery(
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
     userIdFilter: String? = null,
-    favoritesUserId: String? = null
+    favoritesUserId: String? = null,
+    focusedPost: FirebasePost? = null,
+    onFocusedPostChange: (FirebasePost?) -> Unit = {}
 ) {
     val db = remember { Firebase.firestore }
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
@@ -103,7 +106,9 @@ fun PostsGallery(
             GalleryViewMode.MAP -> {
                 PostMap(
                     posts = posts,
-                    onPostClick = onPostClick
+                    onPostClick = onPostClick,
+                    focusedPost = focusedPost,
+                    onFocusedPostChange = onFocusedPostChange
                 )
             }
         }
@@ -180,24 +185,73 @@ fun PostGrid(
 fun PostMap(
     posts: List<FirebasePost>,
     onPostClick: (FirebasePost) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusedPost: FirebasePost? = null,
+    onFocusedPostChange: (FirebasePost?) -> Unit = {}
 ) {
+    val db = remember { Firebase.firestore }
     val montpellier = LatLng(43.6107, 3.8767)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(montpellier, 12f)
     }
+    
+    var focusedPostSteps by remember { mutableStateOf<List<FirebaseStep>>(emptyList()) }
+
+    LaunchedEffect(focusedPost) {
+        if (focusedPost != null) {
+            try {
+                val snapshot = db.collection("travelpath_posts")
+                    .document(focusedPost.id)
+                    .collection("steps")
+                    .orderBy("order")
+                    .get()
+                    .await()
+                focusedPostSteps = snapshot.toObjects(FirebaseStep::class.java)
+            } catch (e: Exception) {
+                Log.e("PostMap", "Error fetching steps", e)
+            }
+        } else {
+            focusedPostSteps = emptyList()
+        }
+    }
 
     GoogleMap(
         modifier = modifier.fillMaxSize(),
-        cameraPositionState = cameraPositionState
+        cameraPositionState = cameraPositionState,
+        onMapClick = { onFocusedPostChange(null) }
     ) {
-        posts.forEach { post ->
+        if (focusedPost == null) {
+            posts.forEach { post ->
+                Marker(
+                    state = MarkerState(position = LatLng(post.latitude, post.longitude)),
+                    title = post.title,
+                    snippet = post.locationName,
+                    onClick = {
+                        onFocusedPostChange(post)
+                        onPostClick(post)
+                        true // Return true to consume the click and not show default info window yet
+                    }
+                )
+            }
+        } else {
+            // Show only the steps of the focused post
+            focusedPostSteps.forEachIndexed { index, step ->
+                Marker(
+                    state = MarkerState(position = LatLng(step.latitude, step.longitude)),
+                    title = "Étape ${index + 1}: ${step.name}",
+                    snippet = step.description,
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                )
+            }
+            
+            // Optionally also show the main post marker in a different color
             Marker(
-                state = MarkerState(position = LatLng(post.latitude, post.longitude)),
-                title = post.title,
-                snippet = post.locationName,
+                state = MarkerState(position = LatLng(focusedPost.latitude, focusedPost.longitude)),
+                title = focusedPost.title,
+                snippet = "Départ",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                 onClick = {
-                    onPostClick(post)
+                    onPostClick(focusedPost)
                     false
                 }
             )

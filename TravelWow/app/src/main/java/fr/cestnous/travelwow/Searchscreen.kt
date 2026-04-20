@@ -156,12 +156,16 @@ fun SearchTopBar(
 fun SearchScreen(
     onPostClick: (FirebasePost) -> Unit,
     viewMode: GalleryViewMode,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusedPost: FirebasePost? = null,
+    onFocusedPostChange: (FirebasePost?) -> Unit = {}
 ) {
     PostsGallery(
         onPostClick = onPostClick,
         viewMode = viewMode,
-        modifier = modifier
+        modifier = modifier,
+        focusedPost = focusedPost,
+        onFocusedPostChange = onFocusedPostChange
     )
 }
 

@@ -103,6 +103,7 @@ fun TravelWowApp(
     }
 
     var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
+    var focusedPostForMap by remember { mutableStateOf<FirebasePost?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
     
@@ -147,6 +148,13 @@ fun TravelWowApp(
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
     )
+    
+    // Auto-expand when bottom sheet is shown
+    LaunchedEffect(showBottomSheet) {
+        if (showBottomSheet) {
+            sheetState.expand()
+        }
+    }
 
     NavigationSuiteScaffold(
         modifier = Modifier.fillMaxSize(),
@@ -402,10 +410,13 @@ fun TravelWowApp(
                                         SearchScreen(
                                             onPostClick = { post ->
                                                 selectedPost = post
+                                                focusedPostForMap = post
                                                 showBottomSheet = true
                                             },
                                             viewMode = galleryViewMode,
-                                            modifier = Modifier
+                                            modifier = Modifier,
+                                            focusedPost = focusedPostForMap,
+                                            onFocusedPostChange = { focusedPostForMap = it }
                                         )
                                     }
                                 }
@@ -413,11 +424,14 @@ fun TravelWowApp(
                                     PostsGallery(
                                         onPostClick = { post ->
                                             selectedPost = post
+                                            focusedPostForMap = post
                                             showBottomSheet = true
                                         },
                                         viewMode = galleryViewMode,
                                         modifier = Modifier.fillMaxSize(),
-                                        favoritesUserId = user.uid
+                                        favoritesUserId = user.uid,
+                                        focusedPost = focusedPostForMap,
+                                        onFocusedPostChange = { focusedPostForMap = it }
                                     )
                                 }
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
@@ -441,11 +455,14 @@ fun TravelWowApp(
                                         PostsGallery(
                                             onPostClick = { post ->
                                                 selectedPost = post
+                                                focusedPostForMap = post
                                                 showBottomSheet = true
                                             },
                                             viewMode = galleryViewMode,
                                             modifier = Modifier.weight(1f),
-                                            userIdFilter = user.uid
+                                            userIdFilter = user.uid,
+                                            focusedPost = focusedPostForMap,
+                                            onFocusedPostChange = { focusedPostForMap = it }
                                         )
                                     }
                                 }
@@ -461,6 +478,7 @@ fun TravelWowApp(
                     onDismissRequest = {
                         showBottomSheet = false
                         selectedPost = null
+                        focusedPostForMap = null
                     },
                     sheetState = sheetState,
                     currentUserProfile = userProfile
