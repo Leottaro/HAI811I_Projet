@@ -19,39 +19,56 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import androidx.core.net.toUri
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.storage.ktx.storage
+import com.google.firebase.auth.FirebaseUser as AuthUser
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.UploadCallback
+import com.cloudinary.android.callback.ErrorInfo
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+
+suspend fun uploadToCloudinary(uri: String, context: android.content.Context): String = suspendCancellableCoroutine { continuation ->
+    MediaManager.get().upload(uri.toUri())
+        .option("resource_type", "auto")
+        .option("upload_preset", BuildConfig.CLOUDINARY_UPLOAD_PRESET)
+        .callback(object : UploadCallback {
+            override fun onStart(requestId: String) {}
+            override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
+            override fun onSuccess(requestId: String, resultData: Map<*, *>) {
+                val url = resultData["secure_url"] as? String ?: ""
+                continuation.resume(url)
+            }
+            override fun onError(requestId: String, error: ErrorInfo) {
+                continuation.resumeWithException(Exception(error.description))
+            }
+            override fun onReschedule(requestId: String, error: ErrorInfo) {}
+        })
+        .dispatch(context)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TravelWowApp(
-    user: FirebaseUser,
+    user: AuthUser,
     onLogout: () -> Unit
 ) {
-    val username = remember(user) {
-        user.displayName?.takeIf { it.isNotBlank() } 
-            ?: user.email?.substringBefore("@") 
-            ?: "Utilisateur"
-    }
-    
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showEditProfile by rememberSaveable { mutableStateOf(false) }
-    var userBio by rememberSaveable { mutableStateOf("") }
-    var customUsername by rememberSaveable { mutableStateOf("") }
-    var profilePhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var userSettings by remember { mutableStateOf(FirebaseUserSettings()) }
+    
+    var userProfile by remember { mutableStateOf<FirebaseUser?>(null) }
     var userPostCount by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     val db = remember { Firebase.firestore }
-    val storage = remember { Firebase.storage("gs://travelapp-4a34b.firebasestorage.app") }
 
     // Load user profile and post count from Firestore
     LaunchedEffect(user.uid) {
@@ -59,28 +76,20 @@ fun TravelWowApp(
             // Load Profile
             val doc = db.collection("travelpath").document(user.uid).get().await()
             if (doc.exists()) {
-                val profile = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
-                profile?.let {
-                    customUsername = it.username
-                    userBio = it.bio
-                    profilePhotoUri = it.photoUrl
-                    userSettings = it.settings
-                }
+                userProfile = doc.toObject(FirebaseUser::class.java)
             } else {
                 // Initialize profile if it doesn't exist
                 val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
                     ?: user.email?.substringBefore("@") 
                     ?: "Utilisateur"
-                val initialProfile = fr.cestnous.travelwow.FirebaseUser(
+                val initialProfile = FirebaseUser(
                     id = user.uid,
                     username = initialUsername,
                     email = user.email ?: "",
                     bio = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾"
                 )
                 db.collection("travelpath").document(user.uid).set(initialProfile).await()
-                customUsername = initialProfile.username
-                userBio = initialProfile.bio
-                userSettings = initialProfile.settings
+                userProfile = initialProfile
             }
 
             // Load Post Count
@@ -93,8 +102,6 @@ fun TravelWowApp(
             e.printStackTrace()
         }
     }
-    
-    val effectiveUsername = customUsername.ifBlank { username }
 
     var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
@@ -209,12 +216,15 @@ fun TravelWowApp(
                                         val firebaseSteps = postSteps.mapIndexed { index, step ->
                                             val stepImageUrls = step.images.mapIndexed { imgIndex, uri ->
                                                 if (uri.startsWith("content://") || uri.startsWith("file://")) {
-                                                    Log.d("TravelWowApp", "Uploading step image $imgIndex for step ${step.id}...")
-                                                    val storageRef = storage.reference.child("posts/${user.uid}/${step.id}/image_$imgIndex.jpg")
-                                                    storageRef.putFile(uri.toUri()).await()
-                                                    val downloadUrl = storageRef.downloadUrl.await().toString()
-                                                    Log.d("TravelWowApp", "Step image $imgIndex uploaded: $downloadUrl")
-                                                    downloadUrl
+                                                    Log.d("TravelWowApp", "Uploading step image $imgIndex to Cloudinary...")
+                                                    try {
+                                                        val downloadUrl = uploadToCloudinary(uri, context)
+                                                        Log.d("TravelWowApp", "Step image $imgIndex uploaded: $downloadUrl")
+                                                        downloadUrl
+                                                    } catch (e: Exception) {
+                                                        Log.e("TravelWowApp", "Failed to upload to Cloudinary", e)
+                                                        throw e
+                                                    }
                                                 } else {
                                                     uri
                                                 }
@@ -235,8 +245,8 @@ fun TravelWowApp(
                                         val post = FirebasePost(
                                             id = postId,
                                             authorId = user.uid,
-                                            authorName = effectiveUsername,
-                                            authorPhotoUrl = profilePhotoUri,
+                                            authorName = userProfile?.username ?: "Utilisateur inconnu",
+                                            authorPhotoUrl = userProfile?.photoUrl,
                                             title = postTitle,
                                             locationName = firebaseSteps.firstOrNull()?.name ?: "Lieu inconnu",
                                             description = postDescription,
@@ -291,67 +301,43 @@ fun TravelWowApp(
             if (showEditProfile) {
                 EditProfileScreen(
                     userId = user.uid,
-                    currentUsername = effectiveUsername,
-                    currentBio = userBio,
-                    currentPhotoUri = profilePhotoUri,
+                    currentUsername = userProfile?.username ?: "Utilisateur inconnu",
+                    currentBio = userProfile?.bio ?: "",
+                    currentPhotoUri = userProfile?.photoUrl,
                     onBack = { showEditProfile = false },
                     onSave = { newName, newBio, newPhotoUri ->
                         coroutineScope.launch {
                             try {
-                                Log.d("TravelWowApp", "Saving profile. Photo URI: $newPhotoUri")
+                                Log.d("TravelWowApp", "Starting profile save to Cloudinary. PhotoUri: $newPhotoUri")
                                 var finalPhotoUrl = newPhotoUri
                                 
-                                // Upload image if it's a local URI
+                                // Upload image to Cloudinary if it's a local URI
                                 if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
-                                    Log.d("TravelWowApp", "Uploading new profile picture...")
-                                    val storageRef = storage.reference.child("users/${user.uid}/profile.jpg")
-                                    storageRef.putFile(newPhotoUri.toUri()).await()
-                                    finalPhotoUrl = storageRef.downloadUrl.await().toString()
-                                    Log.d("TravelWowApp", "Upload successful. New URL: $finalPhotoUrl")
+                                    finalPhotoUrl = uploadToCloudinary(newPhotoUri, context)
+                                    Log.d("TravelWowApp", "Profile pic upload successful: $finalPhotoUrl")
                                 }
 
-                                val userRef = db.collection("travelpath").document(user.uid)
                                 val updates = mutableMapOf<String, Any>(
                                     "username" to newName,
                                     "bio" to newBio
                                 )
                                 finalPhotoUrl?.let { updates["photoUrl"] = it }
                                 
-                                userRef.update(updates).await()
-                                Log.d("TravelWowApp", "Firestore update successful")
+                                db.collection("travelpath").document(user.uid)
+                                    .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                                    .await()
                                 
-                                customUsername = newName
-                                userBio = newBio
-                                profilePhotoUri = finalPhotoUrl
+                                Log.d("TravelWowApp", "Firestore profile updated")
+                                
+                                userProfile = userProfile?.copy(
+                                    username = newName,
+                                    bio = newBio,
+                                    photoUrl = finalPhotoUrl
+                                )
                                 showEditProfile = false
                             } catch (e: Exception) {
-                                Log.e("TravelWowApp", "Error saving profile", e)
-                                e.printStackTrace()
-                                // Fallback logic remains
-                                try {
-                                    var finalPhotoUrl = newPhotoUri
-                                    if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
-                                        val storageRef = storage.reference.child("users/${user.uid}/profile.jpg")
-                                        storageRef.putFile(newPhotoUri.toUri()).await()
-                                        finalPhotoUrl = storageRef.downloadUrl.await().toString()
-                                    }
-
-                                    val newUser = fr.cestnous.travelwow.FirebaseUser(
-                                        id = user.uid,
-                                        username = newName,
-                                        email = user.email ?: "",
-                                        bio = newBio,
-                                        photoUrl = finalPhotoUrl
-                                    )
-                                    db.collection("travelpath").document(user.uid).set(newUser).await()
-                                    customUsername = newName
-                                    userBio = newBio
-                                    profilePhotoUri = finalPhotoUrl
-                                    showEditProfile = false
-                                } catch (e2: Exception) {
-                                    Log.e("TravelWowApp", "Error in fallback save", e2)
-                                    e2.printStackTrace()
-                                }
+                                Log.e("TravelWowApp", "Error saving profile: ${e.message}", e)
+                                // In a real app, show a Snackbar here
                             }
                         }
                     },
@@ -359,7 +345,7 @@ fun TravelWowApp(
                 )
             } else if (showSettings) {
                 SettingsScreen(
-                    settings = userSettings,
+                    settings = userProfile?.settings ?: FirebaseUserSettings(),
                     userEmail = user.email ?: "Utilisateur",
                     onBack = { showSettings = false },
                     onLogout = { 
@@ -372,7 +358,7 @@ fun TravelWowApp(
                                 db.collection("travelpath").document(user.uid)
                                     .update("settings", newSettings)
                                     .await()
-                                userSettings = newSettings
+                                userProfile = userProfile?.copy(settings = newSettings)
                                 showSettings = false
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -433,10 +419,12 @@ fun TravelWowApp(
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         ProfileHeader(
-                                            username = effectiveUsername,
-                                            bio = userBio,
-                                            photoUri = profilePhotoUri,
+                                            username = userProfile?.username ?: "Utilisateur inconnu",
+                                            bio = userProfile?.bio ?: "",
+                                            photoUri = userProfile?.photoUrl,
                                             postsCount = userPostCount,
+                                            followersCount = userProfile?.followersCount ?: 0,
+                                            followingCount = userProfile?.followingCount ?: 0,
                                             viewMode = galleryViewMode,
                                             onViewModeChange = { galleryViewMode = it },
                                             onSettingsClick = { showSettings = true },

@@ -15,8 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
 
 @Composable
@@ -30,30 +30,40 @@ fun UserDetailDialog(
 
     LaunchedEffect(userId) {
         try {
-            Log.d("UserDetailDialog", "Fetching user from path: travelpath/$userId")
+            Log.d("UserDetailDialog", "--- Loading User Details ---")
+            Log.d("UserDetailDialog", "UserId: $userId")
+            Log.d("UserDetailDialog", "Fetching user from Firestore: travelpath/$userId")
+            
             val db = Firebase.firestore
             val doc = db.collection("travelpath")
                 .document(userId)
                 .get()
                 .await()
+            
             if (doc.exists()) {
                 userDetails = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
-                Log.d("UserDetailDialog", "User loaded: ${userDetails?.username}")
+                Log.d("UserDetailDialog", "User data retrieved successfully")
+                Log.d("UserDetailDialog", "Username: ${userDetails?.username}")
+                Log.d("UserDetailDialog", "PhotoUrl: ${userDetails?.photoUrl}")
+                Log.d("UserDetailDialog", "Bio length: ${userDetails?.bio?.length ?: 0}")
             } else {
-                Log.d("UserDetailDialog", "No document found for userId: $userId")
+                Log.w("UserDetailDialog", "No document found in Firestore for userId: $userId")
             }
 
             // Fetch post count
+            Log.d("UserDetailDialog", "Fetching post count for user...")
             val countSnapshot = db.collection("travelpath_posts")
                 .whereEqualTo("authorId", userId)
                 .get()
                 .await()
             userPostCount = countSnapshot.size()
+            Log.d("UserDetailDialog", "Found $userPostCount posts for user")
+            
         } catch (e: Exception) {
-            Log.e("UserDetailDialog", "Error fetching user details", e)
-            e.printStackTrace()
+            Log.e("UserDetailDialog", "CRITICAL ERROR fetching user details for ID: $userId", e)
         } finally {
             isLoading = false
+            Log.d("UserDetailDialog", "--- Loading Finished ---")
         }
     }
 

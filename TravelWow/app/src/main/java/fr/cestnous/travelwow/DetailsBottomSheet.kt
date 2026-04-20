@@ -1,5 +1,6 @@
 package fr.cestnous.travelwow
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
 
 data class Comment(
@@ -247,6 +248,7 @@ fun DetailsBottomSheet(
                         CommentItem(
                             comment = comment,
                             onAuthorClick = {
+                                Log.d("DetailsBottomSheet", "Author clicked: ${comment.author} (ID: ${comment.authorId})")
                                 selectedUserId = comment.authorId
                                 showUserDialog = true
                             }
