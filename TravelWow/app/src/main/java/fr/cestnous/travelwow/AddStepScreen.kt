@@ -1,59 +1,151 @@
 package fr.cestnous.travelwow
 
 
-import android.location.Geocoder
+import android.net.Uri
 import android.os.Build
+import android.util.Log
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
-import com.google.maps.android.compose.MapsComposeExperimentalApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 import kotlin.math.roundToInt
+import android.location.Geocoder
+
+// Geocoder is free for basic location search.
+// Routes API used for travel duration/distance (cheaper than Places API).
+
+suspend fun fetchRouteInfo(origin: LatLng, destination: LatLng): String? = withContext(Dispatchers.IO) {
+    val apiKey = BuildConfig.MAPS_API_KEY
+    val url = URL("https://routes.googleapis.com/directions/v2:computeRoutes")
+    try {
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.setRequestProperty("X-Goog-Api-Key", apiKey)
+        connection.setRequestProperty("X-Goog-FieldMask", "routes.duration,routes.distanceMeters")
+        connection.doOutput = true
+
+        val body = JSONObject().apply {
+            put("origin", JSONObject().put("location", JSONObject().put("latLng", JSONObject().apply {
+                put("latitude", origin.latitude)
+                put("longitude", origin.longitude)
+            })))
+            put("destination", JSONObject().put("location", JSONObject().put("latLng", JSONObject().apply {
+                put("latitude", destination.latitude)
+                put("longitude", destination.longitude)
+            })))
+            put("travelMode", "DRIVE")
+        }
+
+        connection.outputStream.use { it.write(body.toString().toByteArray()) }
+
+        if (connection.responseCode == 200) {
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            val routes = json.optJSONArray("routes")
+            if (routes != null && routes.length() > 0) {
+                val route = routes.getJSONObject(0)
+                val distance = route.optInt("distanceMeters") / 1000.0
+                val durationStr = route.optString("duration", "0s")
+                val durationMin = durationStr.removeSuffix("s").toLongOrNull()?.let { it / 60 } ?: 0
+                return@withContext "Distance: %.1f km • Durée: %d min".format(distance, durationMin)
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("RoutesAPI", "Error fetching route", e)
+    }
+    null
+}
+
+suspend fun fetchWikidataPhotos(lat: Double, lng: Double, name: String): List<String> = withContext(Dispatchers.IO) {
+    val cleanName = name.substringBefore("(").trim().lowercase()
+    val radius = if (cleanName.isNotEmpty()) "0.8" else "0.5" // Reduced radius for better relevance
+    
+    val query = """
+        SELECT DISTINCT ?item ?image ?label ?dist WHERE {
+          ?item wdt:P18 ?image .
+          ?item rdfs:label ?label .
+          FILTER(LANG(?label) = "fr" || LANG(?label) = "en")
+          SERVICE wikibase:around {
+            ?item wdt:P625 ?location .
+            bd:serviceParam wikibase:center "Point($lng $lat)"^^geo:wktLiteral .
+            bd:serviceParam wikibase:radius "$radius" .
+            bd:serviceParam wikibase:distance ?dist .
+          }
+          ${if (cleanName.isNotEmpty()) "BIND(IF(CONTAINS(LCASE(?label), \"$cleanName\"), 1, 0) AS ?match)" else "BIND(1 AS ?match)"}
+        } ORDER BY DESC(?match) ?dist LIMIT 25
+    """.trimIndent()
+
+    val url = URL("https://query.wikidata.org/sparql?query=${Uri.encode(query)}&format=json")
+    try {
+        val connection = url.openConnection() as HttpURLConnection
+        // Wikimedia requires an identifiable User-Agent
+        val userAgent = "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)"
+        connection.setRequestProperty("User-Agent", userAgent)
+        connection.setRequestProperty("Accept", "application/json")
+        
+        if (connection.responseCode == 200) {
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            val bindings = json.getJSONObject("results").getJSONArray("bindings")
+            val photos = mutableListOf<String>()
+            for (i in 0 until bindings.length()) {
+                val photoUrl = bindings.getJSONObject(i).optJSONObject("image")?.optString("value")
+                if (photoUrl != null) {
+                    // Extract filename and use thumb.php for reliable scaling and fewer 403s
+                    val fileName = photoUrl.substringAfter("Special:FilePath/")
+                    val thumbUrl = "https://commons.wikimedia.org/w/thumb.php?f=$fileName&w=800"
+                    photos.add(thumbUrl)
+                }
+            }
+            val result = photos.distinct().take(6)
+            Log.d("Wikidata", "Found ${result.size} relevant photos for $name")
+            return@withContext result
+        }
+    } catch (e: Exception) {
+        Log.e("Wikidata", "Error fetching photos", e)
+    }
+    emptyList()
+}
 
 @Composable
 fun AddStepScreen(
@@ -62,8 +154,12 @@ fun AddStepScreen(
     stepImages: List<String>,
     onStepImagesChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
+    lastStepLocation: LatLng? = null,
     onLocationSelected: (LatLng) -> Unit = {}
 ) {
+    LaunchedEffect(Unit) {
+        Log.d("AddStepScreen", "AddStepScreen Composable entered")
+    }
     var searchQuery by remember { mutableStateOf("") }
 
     val context = LocalContext.current
@@ -72,11 +168,57 @@ fun AddStepScreen(
 
     // Default position (e.g., Montpellier)
     var selectedLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
+    var routeInfo by remember { mutableStateOf<String?>(null) }
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(selectedLocation, 12f)
     }
 
     var currentPoiPhotos by remember { mutableStateOf(emptyList<String>()) }
+
+    // Helper to get photos using free Wikidata + loremflickr fallback
+    fun updatePoiPhotos(latLng: LatLng, name: String) {
+        val displayName = name.ifBlank { searchQuery }
+        Log.d("AddStepScreen", "Updating POI photos for: $displayName at $latLng")
+        coroutineScope.launch {
+            try {
+                val wikidataPhotos = fetchWikidataPhotos(latLng.latitude, latLng.longitude, displayName)
+                if (wikidataPhotos.isNotEmpty()) {
+                    Log.d("AddStepScreen", "Using ${wikidataPhotos.size} Wikidata photos")
+                    currentPoiPhotos = wikidataPhotos
+                } else {
+                    // Fallback to loremflickr
+                    Log.d("AddStepScreen", "No Wikidata photos found, falling back to loremflickr")
+                    val cleanName = displayName.substringBefore("(").trim()
+                    val searchTerms = if (cleanName.isBlank()) "travel" else cleanName.replace(" ", ",")
+                    val fallbackPhotos = (1..5).map {
+                        "https://loremflickr.com/400/300/$searchTerms?lock=$it"
+                    }
+                    Log.d("AddStepScreen", "Fallback URLs: $fallbackPhotos")
+                    currentPoiPhotos = fallbackPhotos
+                }
+            } catch (e: Exception) {
+                Log.e("AddStepScreen", "Error in updatePoiPhotos", e)
+            }
+        }
+    }
+
+    // Helper to calculate route from previous location
+    fun updateLocationInfo(newLatLng: LatLng, name: String) {
+        Log.d("AddStepScreen", "updateLocationInfo called for $name at $newLatLng")
+        selectedLocation = newLatLng
+        onLocationSelected(newLatLng)
+        onStepNameChange(name)
+        updatePoiPhotos(newLatLng, name)
+        
+        // Calculate route from previous step if exists
+        lastStepLocation?.let { origin ->
+            Log.d("AddStepScreen", "Requesting route from $origin to $newLatLng")
+            coroutineScope.launch {
+                routeInfo = fetchRouteInfo(origin, newLatLng)
+            }
+        }
+    }
 
     // Drag and drop state for images
     var draggedItemUri by remember { mutableStateOf<String?>(null) }
@@ -90,24 +232,6 @@ fun AddStepScreen(
     // Use updated state to avoid stale closures in pointerInput
     val currentImagesList by rememberUpdatedState(stepImages)
     val onImagesChangeAction by rememberUpdatedState(onStepImagesChange)
-
-    // Helper to get photos for a POI name
-    fun updatePoiPhotos(name: String) {
-        val cleanName = name.substringBefore("(").trim()
-
-        // On simule une recherche "Google Images" avec loremflickr (basé sur des tags)
-        // C'est beaucoup plus réaliste et ça marche pour n'importe quel lieu
-        val searchTerms = if (cleanName.isBlank()) "travel" else cleanName.replace(" ", ",")
-        val webPhotos = listOf(
-            "https://loremflickr.com/400/300/$searchTerms?lock=1",
-            "https://loremflickr.com/400/300/$searchTerms?lock=2",
-            "https://loremflickr.com/400/300/$searchTerms?lock=3",
-            "https://loremflickr.com/400/300/$searchTerms?lock=4",
-            "https://loremflickr.com/400/300/$searchTerms?lock=5"
-        )
-
-        currentPoiPhotos = webPhotos.distinct()
-    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
@@ -139,21 +263,23 @@ fun AddStepScreen(
             placeholder = { Text("Ex: Tour Eiffel, Paris") },
             trailingIcon = {
                 IconButton(onClick = {
+                    Log.d("AddStepScreen", "Search button clicked with query: $searchQuery")
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 geocoder.getFromLocationName(searchQuery, 1) { addresses ->
                                     if (addresses.isNotEmpty()) {
                                         val address = addresses[0]
+                                        Log.d("AddStepScreen", "Address found (Tiramisu+): $address")
                                         val newLatLng = LatLng(address.latitude, address.longitude)
                                         val name = address.featureName ?: searchQuery
                                         coroutineScope.launch {
-                                            selectedLocation = newLatLng
-                                            onLocationSelected(newLatLng)
+                                            Log.d("AddStepScreen", "Address found (Tiramisu+): $address")
                                             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(newLatLng, 15f))
-                                            onStepNameChange(name)
-                                            updatePoiPhotos(name)
+                                            updateLocationInfo(newLatLng, name)
                                         }
+                                    } else {
+                                        Log.d("AddStepScreen", "No address found for: $searchQuery")
                                     }
                                 }
                             } else {
@@ -161,19 +287,20 @@ fun AddStepScreen(
                                 val addresses = geocoder.getFromLocationName(searchQuery, 1)
                                 if (addresses?.isNotEmpty() == true) {
                                     val address = addresses[0]
+                                    Log.d("AddStepScreen", "Address found (Legacy): $address")
                                     val newLatLng = LatLng(address.latitude, address.longitude)
                                     val name = address.featureName ?: searchQuery
                                     withContext(Dispatchers.Main) {
-                                        selectedLocation = newLatLng
-                                        onLocationSelected(newLatLng)
+                                        Log.d("AddStepScreen", "Address found (Legacy): $address")
                                         cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(newLatLng, 15f))
-                                        onStepNameChange(name)
-                                        updatePoiPhotos(name)
+                                        updateLocationInfo(newLatLng, name)
                                     }
+                                } else {
+                                    Log.d("AddStepScreen", "No address found (Legacy) for: $searchQuery")
                                 }
                             }
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e("AddStepScreen", "Geocoder error", e)
                         }
                     }
                 }) {
@@ -183,6 +310,23 @@ fun AddStepScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         )
+
+        // Route Info Section
+        routeInfo?.let { info ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Spacer(Modifier.width(8.dp))
+                    Text(info, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+            }
+        }
 
         // Existing Photos Section
         if (currentPoiPhotos.isNotEmpty()) {
@@ -204,7 +348,11 @@ fun AddStepScreen(
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             AsyncImage(
-                                model = photoUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(photoUrl)
+                                    .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -213,7 +361,13 @@ fun AddStepScreen(
                                             onStepImagesChange(stepImages + photoUrl)
                                         }
                                     },
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                onError = { state ->
+                                    Log.e("AddStepScreen", "AsyncImage error for $photoUrl: ${state.result.throwable}")
+                                },
+                                onSuccess = {
+                                    Log.d("AddStepScreen", "AsyncImage success for $photoUrl")
+                                }
                             )
                         }
                     }
@@ -315,7 +469,11 @@ fun AddStepScreen(
                         }
                 ) {
                     AsyncImage(
-                        model = imageUri,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUri)
+                            .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                            .crossfade(true)
+                            .build(),
                         contentDescription = null,
                         modifier = Modifier
                             .size(80.dp)
@@ -364,15 +522,18 @@ fun AddStepScreen(
                 onMapClick = { latLng ->
                     selectedLocation = latLng
                     onLocationSelected(latLng)
-                    currentPoiPhotos = emptyList() // Reset photos when clicking random spot
+                    updatePoiPhotos(latLng, "")
+                    lastStepLocation?.let { origin ->
+                        coroutineScope.launch {
+                            routeInfo = fetchRouteInfo(origin, latLng)
+                        }
+                    }
                 }
             ) {
                 MapEffect(Unit) { map ->
                     map.setOnPoiClickListener { poi ->
-                        selectedLocation = poi.latLng
-                        onLocationSelected(poi.latLng)
-                        onStepNameChange(poi.name)
-                        updatePoiPhotos(poi.name)
+                        Log.d("AddStepScreen", "POI clicked: ${poi.name} at ${poi.latLng}")
+                        updateLocationInfo(poi.latLng, poi.name)
                     }
                 }
                 Marker(

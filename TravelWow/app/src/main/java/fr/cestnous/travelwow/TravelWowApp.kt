@@ -28,6 +28,7 @@ import com.google.firebase.firestore.firestore
 import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.UploadCallback
 import com.cloudinary.android.callback.ErrorInfo
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.Timestamp
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -390,6 +391,7 @@ fun TravelWowApp(
                                             stepImages = currentStepImages,
                                             onStepImagesChange = { currentStepImages = it },
                                             onLocationSelected = { currentStepLocation = it },
+                                            lastStepLocation = postSteps.lastOrNull()?.let { LatLng(it.latitude, it.longitude) },
                                             modifier = Modifier
                                         )
                                     } else if (showCreatePost) {
