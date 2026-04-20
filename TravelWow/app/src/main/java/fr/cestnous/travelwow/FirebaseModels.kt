@@ -78,7 +78,7 @@ data class FirebaseComment(
     val authorName: String = "",
     val authorPhotoUrl: String? = null,
     val text: String = "",
-    val likesCount: Int = 0,
+    val likedByUsers: List<String> = List(0) { "" },
     val createdAt: Timestamp = Timestamp.now()
 )
 

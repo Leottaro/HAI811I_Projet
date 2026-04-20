@@ -39,7 +39,8 @@ fun PostsGallery(
     onPostClick: (FirebasePost) -> Unit,
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
-    userIdFilter: String? = null
+    userIdFilter: String? = null,
+    favoritesUserId: String? = null
 ) {
     val db = remember { Firebase.firestore }
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
@@ -51,15 +52,15 @@ fun PostsGallery(
             isRefreshing = true
             try {
                 Log.d("PostsGallery", "Fetching posts...")
-                // Fetch posts
-                val baseQuery = db.collection("travelpath_posts")
                 
-                val query: Query = if (userIdFilter != null) {
+                val query: Query = if (favoritesUserId != null) {
+                    Log.d("PostsGallery", "Fetching favorites for: $favoritesUserId")
+                    db.collection("travelpath").document(favoritesUserId).collection("favorites")
+                } else if (userIdFilter != null) {
                     Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
-                    baseQuery.whereEqualTo("authorId", userIdFilter)
+                    db.collection("travelpath_posts").whereEqualTo("authorId", userIdFilter)
                 } else {
-                    // Try to fetch without ordering first to see if it's an index/field issue
-                    baseQuery
+                    db.collection("travelpath_posts")
                 }
 
                 val snapshot = query.limit(50).get().await()

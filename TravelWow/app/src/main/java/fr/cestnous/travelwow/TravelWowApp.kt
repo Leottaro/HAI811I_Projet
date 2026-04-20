@@ -416,7 +416,8 @@ fun TravelWowApp(
                                             showBottomSheet = true
                                         },
                                         viewMode = galleryViewMode,
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
+                                        favoritesUserId = user.uid
                                     )
                                 }
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
@@ -589,22 +590,6 @@ fun ProfileHeader(
                             painter = painterResource(R.drawable.ic_settings),
                             contentDescription = "Paramètres",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Surface(
-                    onClick = onLogoutClick,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_return),
-                            contentDescription = "Déconnexion",
-                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                     }

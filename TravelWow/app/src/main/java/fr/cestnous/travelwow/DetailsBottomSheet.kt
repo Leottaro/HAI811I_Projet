@@ -66,11 +66,23 @@ fun DetailsBottomSheet(
     }
 
     val db = remember { Firebase.firestore }
+    var isFavorite by remember { mutableStateOf(false) }
     val auth = remember { Firebase.auth }
     val currentUser = auth.currentUser
-    Log.d("DetailsBottomSheet", "Current user: $currentUser")
     var newCommentText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
+
+    LaunchedEffect(post?.id, currentUser?.uid) {
+        if (post != null && currentUser != null) {
+            try {
+                val doc = db.collection("travelpath").document(currentUser.uid)
+                    .collection("favorites").document(post.id).get().await()
+                isFavorite = doc.exists()
+            } catch (e: Exception) {
+                Log.e("DetailsBottomSheet", "Error checking favorites", e)
+            }
+        }
+    }
 
     var steps by remember { mutableStateOf<List<FirebaseStep>>(emptyList()) }
     var previewComments by remember { mutableStateOf<List<FirebaseComment>>(emptyList()) }
@@ -469,6 +481,27 @@ fun DetailsBottomSheet(
                         items(previewComments, key = { it.id }) { comment ->
                             CommentItem(
                                 comment = comment,
+                                currentUserId = currentUser?.uid,
+                                onLikeClick = {
+                                    if (currentUser != null) {
+                                        val commentRef = db.collection("travelpath_posts")
+                                            .document(post.id)
+                                            .collection("comments")
+                                            .document(comment.id)
+                                        
+                                        coroutineScope.launch {
+                                            try {
+                                                if (comment.likedByUsers.contains(currentUser.uid)) {
+                                                    commentRef.update("likedByUsers", FieldValue.arrayRemove(currentUser.uid)).await()
+                                                } else {
+                                                    commentRef.update("likedByUsers", FieldValue.arrayUnion(currentUser.uid)).await()
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("DetailsBottomSheet", "Error liking comment", e)
+                                            }
+                                        }
+                                    }
+                                },
                                 onAuthorClick = {
                                     Log.d("DetailsBottomSheet", "Author clicked: ${comment.authorName} (ID: ${comment.authorId})")
                                     selectedUserId = comment.authorId
@@ -483,21 +516,61 @@ fun DetailsBottomSheet(
                         }
                     }
 
-                    IconButton(
-                        onClick = { 
-                            reportTargetId = post.id
-                            reportTargetType = "post"
-                            showReportDialog = true 
-                        },
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(16.dp)
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_warning),
-                            contentDescription = "Signaler",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                        IconButton(
+                            onClick = {
+                                if (post != null && currentUser != null) {
+                                    val favoriteRef = db.collection("travelpath").document(currentUser.uid)
+                                        .collection("favorites").document(post.id)
+                                    
+                                    coroutineScope.launch {
+                                        try {
+                                            if (isFavorite) {
+                                                favoriteRef.delete().await()
+                                                isFavorite = false
+                                            } else {
+                                                // We can store a summary of the post or just the reference
+                                                // Storing the whole post object for easier display in Favorites screen
+                                                favoriteRef.set(post).await()
+                                                isFavorite = true
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("DetailsBottomSheet", "Error updating favorites", e)
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                        ) {
+                            Icon(
+                                painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite),
+                                contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                                tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { 
+                                reportTargetId = post.id
+                                reportTargetType = "post"
+                                showReportDialog = true 
+                            },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_warning),
+                                contentDescription = "Signaler",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -524,11 +597,13 @@ fun StepItemView(step: FirebaseStep) {
 @Composable
 fun CommentItem(
     comment: FirebaseComment,
+    currentUserId: String? = null,
+    onLikeClick: () -> Unit = {},
     onAuthorClick: () -> Unit = {},
     onReportClick: () -> Unit = {}
 ) {
-    var isLiked by remember { mutableStateOf(false) }
-    var likesCount by remember { mutableIntStateOf(comment.likesCount) }
+    val isLiked = currentUserId != null && comment.likedByUsers.contains(currentUserId)
+    val likesCount = comment.likedByUsers.size
 
     Row(
         modifier = Modifier
@@ -586,15 +661,6 @@ fun CommentItem(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        painter = painterResource(R.drawable.ic_warning),
-                        contentDescription = "Signaler",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clickable { onReportClick() },
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                    )
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -606,10 +672,7 @@ fun CommentItem(
             Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = {
-                        if (isLiked) likesCount-- else likesCount++
-                        isLiked = !isLiked
-                    },
+                    onClick = onLikeClick,
                     modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
@@ -624,14 +687,6 @@ fun CommentItem(
                     text = likesCount.toString(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    "Répondre",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { /* Action */ }
                 )
             }
         }
