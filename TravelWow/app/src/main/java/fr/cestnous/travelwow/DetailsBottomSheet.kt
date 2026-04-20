@@ -10,12 +10,17 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,8 +30,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +51,19 @@ fun DetailsBottomSheet(
     var showUserDialog by remember { mutableStateOf(false) }
     var selectedUserId by remember { mutableStateOf<String?>(null) }
     var showCommentDialog by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val isKeyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible) {
+            // Small delay to let the initial layout pass complete
+            kotlinx.coroutines.delay(50)
+            if (sheetState.currentValue == SheetValue.PartiallyExpanded) {
+                sheetState.expand()
+            }
+        }
+    }
 
     val db = remember { Firebase.firestore }
     val auth = remember { Firebase.auth }
@@ -178,6 +195,8 @@ fun DetailsBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxSize()
     ) {
         if (post == null) {
@@ -185,8 +204,119 @@ fun DetailsBottomSheet(
                 CircularProgressIndicator()
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Box(modifier = Modifier.weight(1f)) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = MaterialTheme.colorScheme.surface,
+                bottomBar = {
+                    // Quick Comment Input
+                    Surface(
+                        tonalElevation = 2.dp,
+                        shadowElevation = 8.dp,
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .navigationBarsPadding()
+                                .imePadding(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newCommentText,
+                                onValueChange = { newCommentText = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            coroutineScope.launch {
+                                                sheetState.expand()
+                                            }
+                                        }
+                                    },
+                                placeholder = {
+                                    Text(
+                                        "Ajouter un commentaire...",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                },
+                                maxLines = 3,
+                                shape = RoundedCornerShape(24.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                        alpha = 0.3f
+                                    ),
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                        alpha = 0.3f
+                                    )
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    if (newCommentText.isNotBlank() && currentUser != null) {
+                                        isSending = true
+                                        val commentData = hashMapOf(
+                                            "authorId" to currentUser.uid,
+                                            "authorName" to (currentUserProfile?.username
+                                                ?: currentUser.displayName ?: "Voyageur"),
+                                            "authorPhotoUrl" to (currentUserProfile?.photoUrl
+                                                ?: currentUser.photoUrl?.toString()),
+                                            "text" to newCommentText,
+                                            "likesCount" to 0,
+                                            "createdAt" to FieldValue.serverTimestamp()
+                                        )
+
+                                        db.collection("travelpath_posts").document(post.id)
+                                            .collection("comments")
+                                            .add(commentData)
+                                            .addOnSuccessListener {
+                                                newCommentText = ""
+                                                isSending = false
+                                                // Update comments count in post
+                                                db.collection("travelpath_posts").document(post.id)
+                                                    .update("commentsCount", FieldValue.increment(1))
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Log.e("DetailsBottomSheet", "Error adding comment", e)
+                                                isSending = false
+                                            }
+                                    }
+                                },
+                                enabled = newCommentText.isNotBlank() && !isSending,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (newCommentText.isNotBlank() && !isSending)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                            ) {
+                                if (isSending) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Envoyer",
+                                        tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 16.dp)
@@ -368,89 +498,6 @@ fun DetailsBottomSheet(
                             contentDescription = "Signaler",
                             tint = MaterialTheme.colorScheme.error
                         )
-                    }
-                }
-
-                // Quick Comment Input
-                Surface(
-                    tonalElevation = 2.dp,
-                    shadowElevation = 8.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .navigationBarsPadding()
-                            .imePadding(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = newCommentText,
-                            onValueChange = { newCommentText = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Ajouter un commentaire...", style = MaterialTheme.typography.bodyMedium) },
-                            maxLines = 3,
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = {
-                                if (newCommentText.isNotBlank() && currentUser != null) {
-                                    isSending = true
-                                    val commentData = hashMapOf(
-                                        "authorId" to currentUser.uid,
-                                        "authorName" to (currentUserProfile?.username ?: currentUser.displayName ?: "Voyageur"),
-                                        "authorPhotoUrl" to (currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString()),
-                                        "text" to newCommentText,
-                                        "likesCount" to 0,
-                                        "createdAt" to FieldValue.serverTimestamp()
-                                    )
-
-                                    db.collection("travelpath_posts").document(post.id)
-                                        .collection("comments")
-                                        .add(commentData)
-                                        .addOnSuccessListener {
-                                            newCommentText = ""
-                                            isSending = false
-                                            // Update comments count in post
-                                            db.collection("travelpath_posts").document(post.id)
-                                                .update("commentsCount", FieldValue.increment(1))
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.e("DetailsBottomSheet", "Error adding comment", e)
-                                            isSending = false
-                                        }
-                                }
-                            },
-                            enabled = newCommentText.isNotBlank() && !isSending,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (newCommentText.isNotBlank() && !isSending)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                )
-                        ) {
-                            if (isSending) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Envoyer",
-                                    tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
                     }
                 }
             }
