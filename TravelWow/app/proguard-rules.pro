@@ -12,6 +12,15 @@
 #   public *;
 #}
 
+# Keep Firebase model classes to avoid issues with Firestore deserialization
+-keep class fr.cestnous.travelwow.FirebaseUser { *; }
+-keep class fr.cestnous.travelwow.FirebaseUserSettings { *; }
+-keep class fr.cestnous.travelwow.FirebasePost { *; }
+-keep class fr.cestnous.travelwow.FirebaseStep { *; }
+-keep class fr.cestnous.travelwow.FirebaseComment { *; }
+-keep class fr.cestnous.travelwow.FirebaseInteraction { *; }
+-keep class fr.cestnous.travelwow.InteractionType { *; }
+
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable

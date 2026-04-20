@@ -28,6 +28,7 @@ import com.google.firebase.firestore.firestore
 import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.UploadCallback
 import com.cloudinary.android.callback.ErrorInfo
+import com.google.firebase.Timestamp
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -77,16 +78,14 @@ fun TravelWowApp(
             val doc = db.collection("travelpath").document(user.uid).get().await()
             if (doc.exists()) {
                 userProfile = doc.toObject(FirebaseUser::class.java)
-            } else {
+            } else if (user.email != null) {
                 // Initialize profile if it doesn't exist
                 val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
-                    ?: user.email?.substringBefore("@") 
-                    ?: "Utilisateur"
+                    ?: user.email!!.substringBefore("@")
                 val initialProfile = FirebaseUser(
                     id = user.uid,
                     username = initialUsername,
-                    email = user.email ?: "",
-                    bio = "Explorateur de sentiers et passionné de randonnée. 🏔️🥾"
+                    email = user.email!!,
                 )
                 db.collection("travelpath").document(user.uid).set(initialProfile).await()
                 userProfile = initialProfile
@@ -248,11 +247,15 @@ fun TravelWowApp(
                                             authorName = userProfile?.username ?: "Utilisateur inconnu",
                                             authorPhotoUrl = userProfile?.photoUrl,
                                             title = postTitle,
-                                            locationName = firebaseSteps.firstOrNull()?.name ?: "Lieu inconnu",
+                                            locationName = firebaseSteps.firstOrNull()!!.name,
                                             description = postDescription,
-                                            mainImageUrl = firebaseSteps.firstOrNull()?.imageUrls?.firstOrNull(),
-                                            latitude = firebaseSteps.firstOrNull()?.latitude ?: 0.0,
-                                            longitude = firebaseSteps.firstOrNull()?.longitude ?: 0.0
+                                            mainImageUrl = firebaseSteps.firstOrNull()!!.imageUrls.firstOrNull(),
+                                            latitude = firebaseSteps.firstOrNull()!!.latitude,
+                                            longitude = firebaseSteps.firstOrNull()!!.longitude,
+                                            distanceKm = 0.0,
+                                            durationMinutes = 0,
+                                            steps = firebaseSteps,
+                                            tags = List(0) { "" },
                                         )
                                         
                                         postRef.set(post).await()
@@ -458,7 +461,8 @@ fun TravelWowApp(
                         showBottomSheet = false
                         selectedPost = null
                     },
-                    sheetState = sheetState
+                    sheetState = sheetState,
+                    currentUserProfile = userProfile
                 )
             }
 

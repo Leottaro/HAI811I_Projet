@@ -40,7 +40,7 @@ data class FirebasePost(
     val authorPhotoUrl: String? = null,
     val title: String = "",
     val locationName: String = "",
-    val description: String = "",
+    val description: String? = null,
     val mainImageUrl: String? = null,
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
@@ -76,6 +76,7 @@ data class FirebaseComment(
     @DocumentId val id: String = "",
     val authorId: String = "",
     val authorName: String = "",
+    val authorPhotoUrl: String? = null,
     val text: String = "",
     val likesCount: Int = 0,
     val createdAt: Timestamp = Timestamp.now()
