@@ -38,6 +38,8 @@ fun DetailsBottomSheet(
     currentUserProfile: FirebaseUser? = null
 ) {
     var showReportDialog by remember { mutableStateOf(false) }
+    var reportTargetId by remember { mutableStateOf<String?>(null) }
+    var reportTargetType by remember { mutableStateOf("post") }
     var selectedReason by remember { mutableStateOf<String?>(null) }
     var otherReason by remember { mutableStateOf("") }
     val reportReasons = listOf("Contenu inapproprié", "Spam", "Fausse information", "Autre")
@@ -132,10 +134,27 @@ fun DetailsBottomSheet(
             confirmButton = {
                 Button(
                     onClick = {
-                        // Logique de signalement
+                        if (post != null && currentUser != null) {
+                            val report = FirebaseReport(
+                                reporterId = currentUser.uid,
+                                targetId = reportTargetId ?: post.id,
+                                targetType = reportTargetType,
+                                reason = selectedReason ?: "Non spécifié",
+                                otherReason = if (selectedReason == "Autre") otherReason else null
+                            )
+                            db.collection("reports").add(report)
+                                .addOnSuccessListener {
+                                    Log.d("DetailsBottomSheet", "Report sent successfully")
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("DetailsBottomSheet", "Error sending report", e)
+                                }
+                        }
                         showReportDialog = false
+                        selectedReason = null
+                        otherReason = ""
                     },
-                    enabled = selectedReason != null
+                    enabled = selectedReason != null && (selectedReason != "Autre" || otherReason.isNotBlank())
                 ) {
                     Text("Signaler")
                 }
@@ -324,13 +343,22 @@ fun DetailsBottomSheet(
                                     Log.d("DetailsBottomSheet", "Author clicked: ${comment.authorName} (ID: ${comment.authorId})")
                                     selectedUserId = comment.authorId
                                     showUserDialog = true
+                                },
+                                onReportClick = {
+                                    reportTargetId = comment.id
+                                    reportTargetType = "comment"
+                                    showReportDialog = true
                                 }
                             )
                         }
                     }
 
                     IconButton(
-                        onClick = { showReportDialog = true },
+                        onClick = { 
+                            reportTargetId = post.id
+                            reportTargetType = "post"
+                            showReportDialog = true 
+                        },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
@@ -449,7 +477,8 @@ fun StepItemView(step: FirebaseStep) {
 @Composable
 fun CommentItem(
     comment: FirebaseComment,
-    onAuthorClick: () -> Unit = {}
+    onAuthorClick: () -> Unit = {},
+    onReportClick: () -> Unit = {}
 ) {
     var isLiked by remember { mutableStateOf(false) }
     var likesCount by remember { mutableIntStateOf(comment.likesCount) }
@@ -502,13 +531,24 @@ fun CommentItem(
                     modifier = Modifier.clickable { onAuthorClick() }
                 )
                 
-                val date = comment.createdAt?.toDate() ?: java.util.Date()
-                val sdf = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
-                Text(
-                    text = sdf.format(date),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val date = comment.createdAt?.toDate() ?: java.util.Date()
+                    val sdf = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
+                    Text(
+                        text = sdf.format(date),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        painter = painterResource(R.drawable.ic_warning),
+                        contentDescription = "Signaler",
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clickable { onReportClick() },
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(

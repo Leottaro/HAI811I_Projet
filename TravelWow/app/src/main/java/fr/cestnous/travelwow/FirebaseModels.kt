@@ -93,6 +93,19 @@ data class FirebaseInteraction(
     val timestamp: Timestamp = Timestamp.now()
 )
 
+/**
+ * Model for reporting content.
+ */
+data class FirebaseReport(
+    @DocumentId val id: String = "",
+    val reporterId: String = "",
+    val targetId: String = "",
+    val targetType: String = "post", // "post" or "comment"
+    val reason: String = "",
+    val otherReason: String? = null,
+    val timestamp: Timestamp = Timestamp.now()
+)
+
 enum class InteractionType {
     LIKE, FOLLOW, BOOKMARK
 }
