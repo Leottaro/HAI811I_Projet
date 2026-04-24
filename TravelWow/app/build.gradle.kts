@@ -72,3 +72,8 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation(libs.cloudinary.android)
 }
+
+secrets {
+    propertiesFileName = "local.properties"
+    defaultPropertiesFileName = "local.defaults.properties"
+}

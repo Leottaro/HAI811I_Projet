@@ -38,8 +38,8 @@ import kotlinx.coroutines.tasks.await
 
 suspend fun uploadToCloudinary(uri: String, context: android.content.Context): String = suspendCancellableCoroutine { continuation ->
     MediaManager.get().upload(uri.toUri())
-        .option("resource_type", "auto")
         .option("upload_preset", BuildConfig.CLOUDINARY_UPLOAD_PRESET)
+        .option("unsigned", true)
         .callback(object : UploadCallback {
             override fun onStart(requestId: String) {}
             override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
