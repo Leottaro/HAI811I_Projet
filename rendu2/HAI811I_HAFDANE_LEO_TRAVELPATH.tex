@@ -1,0 +1,173 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage[top=2cm, bottom=2cm, left=2cm, right=2cm]{geometry}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bookmark}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{minted}
+\usepackage{ragged2e}
+\usepackage{xcolor}
+\usepackage{yfonts}
+\usepackage{titling}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{multicol}
+\usepackage{tabto}
+\usepackage{svg}
+\usepackage{array}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{csvsimple}
+\usepackage{booktabs}
+\usepackage{subfig}
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.15}
+\usepackage{mathrsfs}
+\usetikzlibrary{arrows}
+
+\usepackage[normalem]{ulem}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\frenchsetup{StandardLayout=true}
+
+\setlength{\droptitle}{-5em}  
+\pretitle{\centering\LARGE\bfseries}
+\posttitle{\par\vskip 1cm}
+\preauthor{\centering\large}
+\postauthor{\par}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!red,
+  urlcolor=blue!70!black
+}
+\captionsetup[subfigure]{labelformat=empty} % Disable subfigure caption numbering
+\setlength{\floatsep}{5pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{5pt plus 2pt minus 2pt}
+\setlength{\intextsep}{5pt plus 2pt minus 2pt}
+
+
+
+
+
+\title{
+    HAI811I – Programmation mobile \\ 
+    \large Rapport de mi-projet - partie TravelPath
+}
+\date{\today}
+\author{Léo Hafdane – 22202516 \\ \textit{\url{https://github.com/Leottaro/HAI811I_Projet/tree/travelpath}}}
+\renewcommand{\contentsname}{Table des matières}
+
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\maketitle
+\begin{center}
+    \vfill
+    M1 Informatique – IMAGINE \\ Faculté des Sciences \\ Université de Montpellier. \\
+    \includegraphics[width=0.225\textwidth]{ressources/logo_UM.png}
+\end{center}
+
+\begin{justify}
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\subsection*{Tâches accomplies jusqu'ici}
+
+\subsubsection*{Authentification utilisateur \& Gestion du profil}
+\begin{itemize}
+    \item Authentification Firebase : Fonctionnalité de connexion et déconnexion sécurisée.
+    \item Profils personnalisables : Les utilisateurs peuvent définir un nom d'utilisateur, une biographie et téléverser une photo de profil (intégrée avec Cloudinary).
+    \item Statistiques utilisateur : Suivi en temps réel du nombre de publications, d'abonnés et d'abonnements.
+    \item Paramètres : Écran dédié à la gestion des préférences du compte et des configurations de l'application.
+\end{itemize}
+
+\subsubsection*{Création de parcours de visite}
+\begin{itemize}
+    \item Parcours en plusieurs étapes : Possibilité de créer des « TravelPaths » composés de plusieurs étapes séquentielles (monuments, musées, restaurants, loisirs, etc.).
+    \item Médias enrichis : Chaque étape prend en charge plusieurs images, automatiquement téléversées sur Cloudinary.
+    \item Géolocalisation : Intégration avec Google Maps pour sélectionner et afficher des coordonnées précises pour chaque étape d'un parcours.
+    \item Détails de la publication : Champs pour les titres, descriptions et noms de lieux.
+\end{itemize}
+
+\subsubsection*{Découverte \& Exploration}
+\begin{itemize}
+    \item Deux modes d'affichage : Basculer entre une vue Grille/Galerie (axée sur le visuel) et une vue Carte (axée sur la géographie) pour explorer les parcours.
+    \item Fonctionnalité de recherche : Une barre supérieure dédiée à la recherche et à la découverte de nouveaux parcours de visite.
+    \item Détails interactifs : Un panneau de détails permettant aux utilisateurs d'explorer en profondeur les étapes et images d'un parcours sans quitter l'écran principal.
+\end{itemize}
+
+\subsubsection*{Organisation sociale \& personnelle}
+\begin{itemize}
+    \item Système de favoris : Une section dédiée pour sauvegarder et accéder rapidement aux parcours de visite préférés.
+    \item Galerie personnelle : Une galerie propre au profil affichant uniquement les publications de l'utilisateur.
+    \item Interactions sociales : Fenêtres de dialogue pour consulter les informations détaillées d'un utilisateur et gérer les connexions sociales.
+    \item Système de likes : Possibilité d'aimer ou de retirer un like sur un parcours.
+\end{itemize}
+
+\subsubsection*{Infrastructure technique}
+\begin{itemize}
+    \item Intégration Firestore : Synchronisation en temps réel des publications, profils et étapes.
+    \item Intégration Cloudinary : Gestion robuste du téléversement et de l'hébergement des images.
+    \item Design Material 3 : Interface moderne et adaptative utilisant NavigationSuiteScaffold pour une navigation fluide sur différentes tailles d'écran.
+\end{itemize}
+
+\subsection*{Tâches restantes}
+
+\subsubsection*{Saisie des préférences utilisateur}
+\begin{itemize}
+    \item Écran dédié permettant à l'utilisateur de renseigner ses critères avant la génération d'un parcours.
+    \item Sélection des types d'activités souhaitées : restauration, loisirs, découverte, culture.
+    \item Saisie d'une liste de lieux favoris ou obligatoires à inclure dans le parcours.
+    \item Définition d'un budget maximum, d'une durée disponible et d'un niveau d'effort (personnes âgées, enfants, personnes malades, etc.).
+    \item Renseignement des tolérances météorologiques : sensibilité au froid, à la chaleur, à l'humidité.
+\end{itemize}
+
+\subsubsection*{Génération intelligente de parcours}
+\begin{itemize}
+    \item Calcul automatique d'au moins 2 à 3 options de parcours optimisés selon les préférences saisies.
+    \item Proposition de profils distincts : « Économique », « Équilibré » et « Confort ».
+    \item Prise en compte des créneaux d'ouverture des lieux (horaires) lors de la génération.
+    \item Intégration des données météo du jour pour adapter les suggestions en temps réel.
+    \item Possibilité de régénérer un parcours avec des ajustements sans repartir de zéro.
+\end{itemize}
+
+\subsubsection*{Présentation riche des parcours générés}
+\begin{itemize}
+    \item Affichage de l'itinéraire complet avec l'ordre des visites, les distances et les temps de trajet entre chaque étape.
+    \item Suggestions de créneaux horaires pour chaque étape (matin, après-midi, soir).
+    \item Carte interactive intégrant toutes les étapes du parcours.
+    \item Galerie de photos et vidéos associée à chaque étape.
+    \item Résumé global du parcours avec métriques claires : coût total estimé, durée totale, niveau d'effort.
+\end{itemize}
+
+\subsubsection*{Sauvegarde, partage \& export}
+\begin{itemize}
+    \item Sauvegarde d'un parcours généré dans les favoris ou dans le profil de l'utilisateur.
+    \item Partage d'un parcours avec d'autres utilisateurs depuis l'application.
+    \item Export du parcours complet en fichier PDF (étapes, carte, photos, métriques).
+\end{itemize}
+
+\subsubsection*{Mode hors-ligne léger}
+\begin{itemize}
+    \item Mise en cache des données essentielles pour permettre la consultation des parcours sans connexion.
+    \item Compression et stockage local des médias associés aux étapes sauvegardées.
+\end{itemize}
+
+\subsection*{Note}
+
+Je n'ai pas d'appareil Android sur lequel tester mon projet. J'ai fait tout mon possible pour qu'il puisse se lancer convenablement sur un vrai appareil, notamment vis-à-vis des clés API, mais je ne suis pas certain de son fonctionnement réel.
+L'intégralité de mon code est sur ce lien: \textit{\url{https://github.com/Leottaro/HAI811I_Projet/tree/travelpath}}
+
+\end{justify}
+\end{document}
