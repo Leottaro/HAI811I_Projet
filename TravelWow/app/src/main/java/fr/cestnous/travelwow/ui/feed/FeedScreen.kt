@@ -58,7 +58,7 @@ fun FeedScreen(
         } else {
             // GRILLE DE PHOTOS (2 colonnes)
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(3),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

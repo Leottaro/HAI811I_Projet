@@ -105,7 +105,7 @@ fun TravelWowApp(onLogout: () -> Unit) {
                     is Screen.Upload -> UploadScreen(
                         onSuccess = { currentScreen = Screen.Home }
                     )
-                    is Screen.Favorites -> PlaceholderScreen("Mes Favoris (Bientôt disponible)")
+                    is Screen.Favorites -> PlaceholderScreen("favoris a faire")
                     is Screen.Profile -> {
                         if (isAnonymous) {
                             PlaceholderScreen("Connectez-vous pour voir votre profil")

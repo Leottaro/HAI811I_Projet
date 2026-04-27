@@ -25,121 +25,135 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
     val userRepository = UserRepository()
     val auth = FirebaseAuth.getInstance()
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    // On enveloppe tout l'écran dans une Surface pour forcer le fond sombre
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        Text(
-            text = "TravelWow",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = if (isLogin) "Connexion" else "Inscription",
-            style = MaterialTheme.typography.titleMedium
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "TravelWow",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = if (isLogin) "Connexion" else "Inscription",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
 
-        if (!isLogin) {
+            if (!isLogin) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Pseudo unique") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Pseudo unique") },
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+            
             Spacer(modifier = Modifier.height(8.dp))
-        }
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Mot de passe") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Mot de passe") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val cleanEmail = email.trim()
+                    val cleanPassword = password.trim()
+                    val cleanUsername = username.trim()
 
-        Button(
-            onClick = {
-                // Nettoyage des entrées (trim)
-                val cleanEmail = email.trim()
-                val cleanPassword = password.trim()
-                val cleanUsername = username.trim()
-
-                if (cleanEmail.isNotEmpty() && cleanPassword.isNotEmpty()) {
-                    if (isLogin) {
-                        auth.signInWithEmailAndPassword(cleanEmail, cleanPassword)
-                            .addOnCompleteListener { task ->
-                                if (task.isSuccessful) onAuthSuccess()
-                                else Toast.makeText(context, "Identifiants incorrects", Toast.LENGTH_SHORT).show()
+                    if (cleanEmail.isNotEmpty() && cleanPassword.isNotEmpty()) {
+                        if (isLogin) {
+                            auth.signInWithEmailAndPassword(cleanEmail, cleanPassword)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) onAuthSuccess()
+                                    else Toast.makeText(context, "Identifiants incorrects", Toast.LENGTH_SHORT).show()
+                                }
+                        } else {
+                            if (cleanUsername.isBlank()) {
+                                Toast.makeText(context, "Veuillez choisir un pseudo", Toast.LENGTH_SHORT).show()
+                                return@Button
                             }
-                    } else {
-                        if (cleanUsername.isBlank()) {
-                            Toast.makeText(context, "Veuillez choisir un pseudo", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        
-                        scope.launch {
-                            if (userRepository.isUsernameUnique(cleanUsername)) {
-                                auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword)
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            val user = task.result?.user
-                                            if (user != null) {
-                                                scope.launch {
-                                                    userRepository.createUserProfile(
-                                                        UserProfile(uid = user.uid, username = cleanUsername, email = cleanEmail)
-                                                    )
-                                                    onAuthSuccess()
+                            
+                            scope.launch {
+                                if (userRepository.isUsernameUnique(cleanUsername)) {
+                                    auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword)
+                                        .addOnCompleteListener { task ->
+                                            if (task.isSuccessful) {
+                                                val user = task.result?.user
+                                                if (user != null) {
+                                                    scope.launch {
+                                                        userRepository.createUserProfile(
+                                                            UserProfile(uid = user.uid, username = cleanUsername, email = cleanEmail)
+                                                        )
+                                                        onAuthSuccess()
+                                                    }
                                                 }
+                                            } else {
+                                                Toast.makeText(context, "Erreur: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                                             }
-                                        } else {
-                                            Toast.makeText(context, "Erreur: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                                         }
-                                    }
-                            } else {
-                                Toast.makeText(context, "Ce pseudo est déjà pris", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Ce pseudo est déjà pris", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (isLogin) "Continuer" else "Créer mon compte")
-        }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isLogin) "Continuer" else "Créer mon compte")
+            }
 
-        TextButton(onClick = { isLogin = !isLogin }) {
-            Text(if (isLogin) "Pas de compte ? S'inscrire" else "Déjà un compte ? Se connecter")
-        }
+            TextButton(onClick = { isLogin = !isLogin }) {
+                Text(
+                    text = if (isLogin) "Pas de compte ? S'inscrire" else "Déjà un compte ? Se connecter",
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
 
-        OutlinedButton(
-            onClick = {
-                auth.signInAnonymously().addOnCompleteListener { task ->
-                    if (task.isSuccessful) onAuthSuccess()
-                    else Toast.makeText(context, "Erreur mode anonyme", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Découvrir sans compte (Mode Anonyme)")
+            OutlinedButton(
+                onClick = {
+                    auth.signInAnonymously().addOnCompleteListener { task ->
+                        if (task.isSuccessful) onAuthSuccess()
+                        else Toast.makeText(context, "Erreur mode anonyme", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Découvrir sans compte (Mode Anonyme)")
+            }
         }
     }
 }
