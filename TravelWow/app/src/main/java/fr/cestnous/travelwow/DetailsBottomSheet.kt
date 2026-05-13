@@ -1,5 +1,6 @@
 package fr.cestnous.travelwow
 
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +53,9 @@ fun DetailsSheetContent(
     var showUserDialog by remember { mutableStateOf(false) }
     var selectedUserId by remember { mutableStateOf<String?>(null) }
     var showCommentDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var isExporting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val coroutineScope = rememberCoroutineScope()
     val isKeyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -202,6 +207,14 @@ fun DetailsSheetContent(
             postAuthorId = post.authorId,
             postTitle = post.title,
             onDismiss = { showCommentDialog = false },
+            currentUserProfile = currentUserProfile
+        )
+    }
+
+    if (showShareDialog && post != null) {
+        SharePostDialog(
+            post = post,
+            onDismiss = { showShareDialog = false },
             currentUserProfile = currentUserProfile
         )
     }
@@ -601,6 +614,54 @@ fun DetailsSheetContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        IconButton(
+                            onClick = {
+                                if (post != null) {
+                                    isExporting = true
+                                    coroutineScope.launch {
+                                        val file = PdfExporter.exportPostToPdf(context, post, steps)
+                                        isExporting = false
+                                        if (file != null) {
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.provider",
+                                                file
+                                            )
+                                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(uri, "application/pdf")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(intent, "Ouvrir le PDF"))
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                        ) {
+                            if (isExporting) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_download),
+                                    contentDescription = "Exporter en PDF",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { showShareDialog = true },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_switch),
+                                contentDescription = "Partager",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
                         IconButton(
                             onClick = {
                                 if (post != null && currentUser != null) {

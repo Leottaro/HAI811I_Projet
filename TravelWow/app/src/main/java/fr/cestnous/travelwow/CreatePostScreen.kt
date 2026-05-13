@@ -75,6 +75,8 @@ fun CreatePostContent(
     onAddStepClick: () -> Unit,
     onRemoveStep: (TravelStep) -> Unit,
     onStepsChange: (List<TravelStep>) -> Unit,
+    onSaveDraft: () -> Unit = {},
+    isSaving: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var draggedStepId by remember { mutableStateOf<String?>(null) }
@@ -220,6 +222,27 @@ fun CreatePostContent(
                     Icon(painterResource(R.drawable.ic_pin), contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Ajouter une étape avec photos")
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onSaveDraft,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSaving && title.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(painterResource(R.drawable.ic_favorite), contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sauvegarder en brouillon")
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(20.dp))

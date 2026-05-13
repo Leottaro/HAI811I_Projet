@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 import androidx.core.net.toUri
 import com.google.firebase.auth.FirebaseUser as AuthUser
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
 import com.google.firebase.firestore.FieldPath
 import com.cloudinary.android.MediaManager
@@ -158,6 +159,7 @@ fun TravelWowApp(
     var postDescription by remember { mutableStateOf("") }
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
     var isSavingPost by remember { mutableStateOf(false) }
+    var isSavingDraft by remember { mutableStateOf(false) }
     var showPostSuccessDialog by remember { mutableStateOf(false) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -509,6 +511,44 @@ fun TravelWowApp(
                                             onAddStepClick = { showAddStep = true },
                                             onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
                                             onStepsChange = { postSteps = it },
+                                            onSaveDraft = {
+                                                isSavingDraft = true
+                                                coroutineScope.launch {
+                                                    try {
+                                                        val draftRef = db.collection("travelpath").document(user.uid)
+                                                            .collection("drafts").document()
+                                                        
+                                                        val draft = hashMapOf(
+                                                            "title" to postTitle,
+                                                            "description" to postDescription,
+                                                            "steps" to postSteps.map { step ->
+                                                                hashMapOf(
+                                                                    "name" to step.name,
+                                                                    "latitude" to step.latitude,
+                                                                    "longitude" to step.longitude,
+                                                                    "images" to step.images
+                                                                )
+                                                            },
+                                                            "createdAt" to FieldValue.serverTimestamp()
+                                                        )
+                                                        draftRef.set(draft).await()
+                                                        
+                                                        // Reset and close
+                                                        showCreatePost = false
+                                                        postTitle = ""
+                                                        postDescription = ""
+                                                        postSteps = emptyList()
+                                                        
+                                                        // Show success message (maybe re-use dialog or a snackbar)
+                                                        showPostSuccessDialog = true 
+                                                    } catch (e: Exception) {
+                                                        Log.e("TravelWowApp", "Error saving draft", e)
+                                                    } finally {
+                                                        isSavingDraft = false
+                                                    }
+                                                }
+                                            },
+                                            isSaving = isSavingDraft,
                                             modifier = Modifier
                                         )
                                     } else {
@@ -569,27 +609,55 @@ fun TravelWowApp(
                                             onEditProfileClick = { showEditProfile = true }
                                         )
 
+                                        var selectedProfileTab by remember { mutableIntStateOf(0) }
+                                        TabRow(selectedTabIndex = selectedProfileTab) {
+                                            Tab(selected = selectedProfileTab == 0, onClick = { selectedProfileTab = 0 }, text = { Text("Publications") })
+                                            Tab(selected = selectedProfileTab == 1, onClick = { selectedProfileTab = 1 }, text = { Text("Brouillons") })
+                                        }
+
                                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
-                                        PostsGallery(
-                                            onPostClick = { post ->
-                                                selectedPost = post
-                                                focusedPostForMap = post
-                                                showBottomSheet = true
-                                            },
-                                            viewMode = galleryViewMode,
-                                            modifier = Modifier.weight(1f),
-                                            userIdFilter = user.uid,
-                                            focusedPost = focusedPostForMap,
-                                            onFocusedPostChange = { post ->
-                                                focusedPostForMap = post
-                                                if (post == null) {
-                                                    showBottomSheet = false
-                                                    selectedPost = null
+                                        if (selectedProfileTab == 0) {
+                                            PostsGallery(
+                                                onPostClick = { post ->
+                                                    selectedPost = post
+                                                    focusedPostForMap = post
+                                                    showBottomSheet = true
+                                                },
+                                                viewMode = galleryViewMode,
+                                                modifier = Modifier.weight(1f),
+                                                userIdFilter = user.uid,
+                                                focusedPost = focusedPostForMap,
+                                                onFocusedPostChange = { post ->
+                                                    focusedPostForMap = post
+                                                    if (post == null) {
+                                                        showBottomSheet = false
+                                                        selectedPost = null
+                                                    }
+                                                },
+                                                contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
+                                            )
+                                        } else {
+                                            DraftsGallery(
+                                                userId = user.uid,
+                                                modifier = Modifier.weight(1f),
+                                                onDraftClick = { draft ->
+                                                    // Load draft into creation state
+                                                    postTitle = draft.title
+                                                    postDescription = draft.description
+                                                    postSteps = draft.steps.map { s -> 
+                                                        TravelStep(
+                                                            name = s.name,
+                                                            latitude = s.latitude,
+                                                            longitude = s.longitude,
+                                                            images = s.imageUrls
+                                                        )
+                                                    }
+                                                    showCreatePost = true
+                                                    currentDestination = AppDestinations.HOME
                                                 }
-                                            },
-                                            contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }

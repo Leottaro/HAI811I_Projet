@@ -131,5 +131,5 @@ data class FirebaseNotification(
 )
 
 enum class NotificationType {
-    FOLLOW, LIKE, COMMENT, NEW_POST
+    FOLLOW, LIKE, COMMENT, NEW_POST, SHARE_POST
 }
