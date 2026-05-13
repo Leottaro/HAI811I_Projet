@@ -158,14 +158,16 @@ fun SearchScreen(
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
     focusedPost: FirebasePost? = null,
-    onFocusedPostChange: (FirebasePost?) -> Unit = {}
+    onFocusedPostChange: (FirebasePost?) -> Unit = {},
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     PostsGallery(
         onPostClick = onPostClick,
         viewMode = viewMode,
         modifier = modifier,
         focusedPost = focusedPost,
-        onFocusedPostChange = onFocusedPostChange
+        onFocusedPostChange = onFocusedPostChange,
+        contentPadding = contentPadding
     )
 }
 

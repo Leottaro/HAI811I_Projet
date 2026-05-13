@@ -35,7 +35,7 @@ import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsBottomSheet(
+fun DetailsSheetContent(
     post: FirebasePost?,
     onDismissRequest: () -> Unit,
     sheetState: SheetState,
@@ -206,20 +206,20 @@ fun DetailsBottomSheet(
         )
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        if (post == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
+    if (post == null) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(300.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            // Internal Scaffold for the content (to have the bottomBar comment input)
             Scaffold(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f),
                 containerColor = MaterialTheme.colorScheme.surface,
                 bottomBar = {
                     // Quick Comment Input

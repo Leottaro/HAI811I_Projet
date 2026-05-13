@@ -188,9 +188,10 @@ fun TravelWowApp(
     var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
     var currentStepLocation by remember { mutableStateOf(com.google.android.gms.maps.model.LatLng(43.6107, 3.8767)) }
     
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = false
+    val sheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.PartiallyExpanded
     )
+    val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
     // Auto-expand when bottom sheet is shown
     LaunchedEffect(showBottomSheet) {
@@ -221,7 +222,23 @@ fun TravelWowApp(
             }
         }
     ) {
-        Scaffold(
+        BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = if (showBottomSheet) 140.dp else 0.dp,
+            sheetDragHandle = { if (showBottomSheet) BottomSheetDefaults.DragHandle() },
+            sheetSwipeEnabled = showBottomSheet,
+            sheetContent = {
+                DetailsSheetContent(
+                    post = selectedPost,
+                    onDismissRequest = {
+                        showBottomSheet = false
+                        selectedPost = null
+                        focusedPostForMap = null
+                    },
+                    sheetState = sheetState,
+                    currentUserProfile = userProfile
+                )
+            },
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 if (!showSettings && !showEditProfile) {
@@ -394,9 +411,9 @@ fun TravelWowApp(
                         AppDestinations.PROFILE -> { /* No TopAppBar for Profile as requested */ }
                     }
                 }
-            }
-        ) { innerPadding ->
-            if (showEditProfile) {
+            },
+            content = { innerPadding ->
+                if (showEditProfile) {
                 EditProfileScreen(
                     userId = user.uid,
                     currentUsername = userProfile?.username ?: "Utilisateur inconnu",
@@ -504,7 +521,14 @@ fun TravelWowApp(
                                             viewMode = galleryViewMode,
                                             modifier = Modifier,
                                             focusedPost = focusedPostForMap,
-                                            onFocusedPostChange = { focusedPostForMap = it }
+                                            onFocusedPostChange = { post ->
+                                                focusedPostForMap = post
+                                                if (post == null) {
+                                                    showBottomSheet = false
+                                                    selectedPost = null
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
                                         )
                                     }
                                 }
@@ -519,7 +543,14 @@ fun TravelWowApp(
                                         modifier = Modifier.fillMaxSize(),
                                         favoritesUserId = user.uid,
                                         focusedPost = focusedPostForMap,
-                                        onFocusedPostChange = { focusedPostForMap = it }
+                                        onFocusedPostChange = { post ->
+                                            focusedPostForMap = post
+                                            if (post == null) {
+                                                showBottomSheet = false
+                                                selectedPost = null
+                                            }
+                                        },
+                                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
                                     )
                                 }
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
@@ -550,7 +581,14 @@ fun TravelWowApp(
                                             modifier = Modifier.weight(1f),
                                             userIdFilter = user.uid,
                                             focusedPost = focusedPostForMap,
-                                            onFocusedPostChange = { focusedPostForMap = it }
+                                            onFocusedPostChange = { post ->
+                                                focusedPostForMap = post
+                                                if (post == null) {
+                                                    showBottomSheet = false
+                                                    selectedPost = null
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
                                         )
                                     }
                                 }
@@ -559,25 +597,13 @@ fun TravelWowApp(
                     }
                 }
             }
+        )
 
-            if (showBottomSheet) {
-                DetailsBottomSheet(
-                    post = selectedPost,
-                    onDismissRequest = {
-                        showBottomSheet = false
-                        selectedPost = null
-                        focusedPostForMap = null
-                    },
-                    sheetState = sheetState,
-                    currentUserProfile = userProfile
-                )
-            }
-
-            if (showPostSuccessDialog) {
-                PostSuccessDialog(onDismiss = { showPostSuccessDialog = false })
-            }
+        if (showPostSuccessDialog) {
+            PostSuccessDialog(onDismiss = { showPostSuccessDialog = false })
         }
     }
+}
 enum class AppDestinations(
     val label: String,
     val icon: Int,

@@ -45,7 +45,8 @@ fun PostsGallery(
     userIdFilter: String? = null,
     favoritesUserId: String? = null,
     focusedPost: FirebasePost? = null,
-    onFocusedPostChange: (FirebasePost?) -> Unit = {}
+    onFocusedPostChange: (FirebasePost?) -> Unit = {},
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val db = remember { Firebase.firestore }
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
@@ -110,7 +111,8 @@ fun PostsGallery(
                     posts = posts,
                     onPostClick = onPostClick,
                     focusedPost = focusedPost,
-                    onFocusedPostChange = onFocusedPostChange
+                    onFocusedPostChange = onFocusedPostChange,
+                    contentPadding = contentPadding
                 )
             }
         }
@@ -189,7 +191,8 @@ fun PostMap(
     onPostClick: (FirebasePost) -> Unit,
     modifier: Modifier = Modifier,
     focusedPost: FirebasePost? = null,
-    onFocusedPostChange: (FirebasePost?) -> Unit = {}
+    onFocusedPostChange: (FirebasePost?) -> Unit = {},
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val db = remember { Firebase.firestore }
     val montpellier = LatLng(43.6107, 3.8767)
@@ -239,7 +242,8 @@ fun PostMap(
     GoogleMap(
         modifier = modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState,
-        onMapClick = { onFocusedPostChange(null) }
+        onMapClick = { onFocusedPostChange(null) },
+        contentPadding = contentPadding
     ) {
         if (focusedPost == null) {
             posts.forEach { post ->
