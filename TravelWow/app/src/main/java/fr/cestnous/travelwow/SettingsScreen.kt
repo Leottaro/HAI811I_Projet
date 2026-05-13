@@ -154,6 +154,13 @@ fun SettingsScreen(
                             checked = currentSettings.commentsNotifications,
                             onCheckedChange = { currentSettings = currentSettings.copy(commentsNotifications = it) }
                         )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsToggleItem(
+                            title = "Nouveaux abonnés",
+                            description = "Alertes quand quelqu'un vous suit",
+                            checked = currentSettings.newFollowerNotifications,
+                            onCheckedChange = { currentSettings = currentSettings.copy(newFollowerNotifications = it) }
+                        )
                     }
                 }
             }

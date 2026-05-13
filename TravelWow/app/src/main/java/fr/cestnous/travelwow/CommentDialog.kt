@@ -26,12 +26,16 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun CommentDialog(
     postId: String,
+    postAuthorId: String,
+    postTitle: String,
     onDismiss: () -> Unit,
     currentUserProfile: FirebaseUser? = null
 ) {
@@ -43,6 +47,7 @@ fun CommentDialog(
     val db = Firebase.firestore
     val auth = Firebase.auth
     val currentUser = auth.currentUser
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(postId) {
         try {
@@ -182,6 +187,33 @@ fun CommentDialog(
                                         // Update comments count in post
                                         db.collection("travelpath_posts").document(postId)
                                             .update("commentsCount", FieldValue.increment(1))
+
+                                        // Send Notification to Post Author (if not self)
+                                        if (postAuthorId != currentUser.uid) {
+                                            coroutineScope.launch {
+                                                try {
+                                                    val authorDoc = db.collection("travelpath").document(postAuthorId).get().await()
+                                                    val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+                                                    
+                                                    if (authorProfile?.settings?.commentsNotifications == true) {
+                                                        val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                        val notification = FirebaseNotification(
+                                                            recipientId = postAuthorId,
+                                                            senderId = currentUser.uid,
+                                                            senderName = senderName,
+                                                            senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                            type = NotificationType.COMMENT,
+                                                            targetId = postId,
+                                                            title = "Nouveau commentaire !",
+                                                            message = "$senderName a commenté votre parcours \"$postTitle\"."
+                                                        )
+                                                        db.collection("notifications").add(notification)
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("CommentDialog", "Error sending comment notification", e)
+                                                }
+                                            }
+                                        }
                                     }
                                     .addOnFailureListener { e ->
                                         Log.e("CommentDialog", "Error adding comment", e)

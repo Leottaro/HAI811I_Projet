@@ -14,6 +14,7 @@ data class FirebaseUser(
     val email: String = "",
     val bio: String = "",
     val photoUrl: String? = null,
+    val fcmToken: String? = null,
     val followersCount: Int = 0,
     val followingCount: Int = 0,
     val createdAt: Timestamp = Timestamp.now(),
@@ -26,7 +27,8 @@ data class FirebaseUser(
 data class FirebaseUserSettings(
     val followersPostsNotifications: Boolean = true,
     val likesNotifications: Boolean = true,
-    val commentsNotifications: Boolean = true
+    val commentsNotifications: Boolean = true,
+    val newFollowerNotifications: Boolean = true
 )
 
 /**
@@ -108,4 +110,26 @@ data class FirebaseReport(
 
 enum class InteractionType {
     LIKE, FOLLOW, BOOKMARK
+}
+
+/**
+ * Model representing a Notification for the user.
+ * Path: /notifications/{notificationId}
+ */
+data class FirebaseNotification(
+    @DocumentId val id: String = "",
+    val recipientId: String = "",
+    val senderId: String = "",
+    val senderName: String = "",
+    val senderPhotoUrl: String? = null,
+    val type: NotificationType = NotificationType.FOLLOW,
+    val targetId: String = "", // PostId if type is LIKE/COMMENT, else empty
+    val title: String = "",
+    val message: String = "",
+    val isRead: Boolean = false,
+    val createdAt: Timestamp = Timestamp.now()
+)
+
+enum class NotificationType {
+    FOLLOW, LIKE, COMMENT, NEW_POST
 }

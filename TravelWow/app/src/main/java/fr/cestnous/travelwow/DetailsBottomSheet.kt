@@ -199,6 +199,8 @@ fun DetailsBottomSheet(
     if (showCommentDialog && post != null) {
         CommentDialog(
             postId = post.id,
+            postAuthorId = post.authorId,
+            postTitle = post.title,
             onDismiss = { showCommentDialog = false },
             currentUserProfile = currentUserProfile
         )
@@ -288,6 +290,33 @@ fun DetailsBottomSheet(
                                                 // Update comments count in post
                                                 db.collection("travelpath_posts").document(post.id)
                                                     .update("commentsCount", FieldValue.increment(1))
+                                                
+                                                // Send Notification to Post Author (if not self)
+                                                if (post.authorId != currentUser.uid) {
+                                                    coroutineScope.launch {
+                                                        try {
+                                                            val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
+                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+                                                            
+                                                            if (authorProfile?.settings?.commentsNotifications == true) {
+                                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                                val notification = FirebaseNotification(
+                                                                    recipientId = post.authorId,
+                                                                    senderId = currentUser.uid,
+                                                                    senderName = senderName,
+                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                    type = NotificationType.COMMENT,
+                                                                    targetId = post.id,
+                                                                    title = "Nouveau commentaire !",
+                                                                    message = "$senderName a commenté votre parcours \"${post.title}\"."
+                                                                )
+                                                                db.collection("notifications").add(notification)
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            Log.e("DetailsBottomSheet", "Error sending comment notification", e)
+                                                        }
+                                                    }
+                                                }
                                             }
                                             .addOnFailureListener { e ->
                                                 Log.e("DetailsBottomSheet", "Error adding comment", e)
@@ -588,6 +617,31 @@ fun DetailsBottomSheet(
                                                 // Storing the whole post object for easier display in Favorites screen
                                                 favoriteRef.set(post).await()
                                                 isFavorite = true
+
+                                                // Send Notification to Post Author (if not self)
+                                                if (post.authorId != currentUser.uid) {
+                                                    try {
+                                                        val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
+                                                        val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+                                                        
+                                                        if (authorProfile?.settings?.likesNotifications == true) {
+                                                            val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                            val notification = FirebaseNotification(
+                                                                recipientId = post.authorId,
+                                                                senderId = currentUser.uid,
+                                                                senderName = senderName,
+                                                                senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                type = NotificationType.LIKE,
+                                                                targetId = post.id,
+                                                                title = "Nouveau like !",
+                                                                message = "$senderName a aimé votre parcours \"${post.title}\"."
+                                                            )
+                                                            db.collection("notifications").add(notification)
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Log.e("DetailsBottomSheet", "Error sending like notification", e)
+                                                    }
+                                                }
                                             }
                                         } catch (e: Exception) {
                                             Log.e("DetailsBottomSheet", "Error updating favorites", e)

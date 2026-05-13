@@ -188,6 +188,23 @@ fun UserDetailDialog(
                                             db.collection("travelpath").document(userId)
                                                 .update("followersCount", FieldValue.increment(1))
                                             
+                                            // Send Notification if enabled by recipient
+                                            if (userDetails?.settings?.newFollowerNotifications == true) {
+                                                val senderDoc = db.collection("travelpath").document(currentUser.uid).get().await()
+                                                val senderProfile = senderDoc.toObject(FirebaseUser::class.java)
+                                                
+                                                val notification = FirebaseNotification(
+                                                    recipientId = userId,
+                                                    senderId = currentUser.uid,
+                                                    senderName = senderProfile?.username ?: "Un utilisateur",
+                                                    senderPhotoUrl = senderProfile?.photoUrl,
+                                                    type = NotificationType.FOLLOW,
+                                                    title = "Nouveau follower !",
+                                                    message = "${senderProfile?.username ?: "Quelqu'un"} vient de s'abonner à votre profil."
+                                                )
+                                                db.collection("notifications").add(notification)
+                                            }
+
                                             isFollowing = true
                                             userDetails = userDetails?.copy(followersCount = (userDetails?.followersCount ?: 0) + 1)
                                         }

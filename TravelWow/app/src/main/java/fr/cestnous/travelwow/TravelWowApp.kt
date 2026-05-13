@@ -25,9 +25,12 @@ import androidx.core.net.toUri
 import com.google.firebase.auth.FirebaseUser as AuthUser
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.FieldPath
 import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.UploadCallback
 import com.cloudinary.android.callback.ErrorInfo
+import com.google.android.gms.tasks.OnCompleteListener
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.Timestamp
 import kotlin.coroutines.resume
@@ -75,6 +78,17 @@ fun TravelWowApp(
     // Load user profile and post count from Firestore
     LaunchedEffect(user.uid) {
         try {
+            // Get FCM Token
+            FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.w("TravelWowApp", "Fetching FCM registration token failed", task.exception)
+                    return@OnCompleteListener
+                }
+                val token = task.result
+                Log.d("TravelWowApp", "FCM Token: $token")
+                TravelWowMessagingService.updateTokenInFirestore(user.uid, token)
+            })
+
             // Load Profile
             val doc = db.collection("travelpath").document(user.uid).get().await()
             if (doc.exists()) {
@@ -98,6 +112,34 @@ fun TravelWowApp(
                 .get()
                 .await()
             userPostCount = countSnapshot.size()
+
+            // Listen for notifications (Option 1: Free alternative to Firebase Functions)
+            db.collection("notifications")
+                .whereEqualTo("recipientId", user.uid)
+                .whereEqualTo("isRead", false)
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) {
+                        Log.w("TravelWowApp", "Listen failed.", e)
+                        return@addSnapshotListener
+                    }
+
+                    snapshot?.documentChanges?.forEach { dc ->
+                        if (dc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
+                            val notif = dc.document.toObject(FirebaseNotification::class.java)
+                            
+                            // Trigger local notification
+                            TravelWowMessagingService.sendLocalNotification(
+                                context,
+                                notif.title,
+                                notif.message
+                            )
+                            
+                            // Mark as read immediately so it doesn't repeat
+                            db.collection("notifications").document(dc.document.id)
+                                .update("isRead", true)
+                        }
+                    }
+                }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -273,6 +315,50 @@ fun TravelWowApp(
                                         val stepsCollection = postRef.collection("steps")
                                         firebaseSteps.forEach { firebaseStep ->
                                             stepsCollection.document(firebaseStep.id).set(firebaseStep).await()
+                                        }
+
+                                        // Notify all followers
+                                        coroutineScope.launch {
+                                            try {
+                                                val followersSnapshot = db.collection("travelpath")
+                                                    .document(user.uid)
+                                                    .collection("followers")
+                                                    .get()
+                                                    .await()
+
+                                                val senderName = userProfile?.username ?: "Un voyageur"
+                                                val followerIds = followersSnapshot.documents.map { it.id }
+
+                                                if (followerIds.isNotEmpty()) {
+                                                    // Process in chunks of 10 to check settings
+                                                    followerIds.chunked(10).forEach { chunk ->
+                                                        val profiles = db.collection("travelpath")
+                                                            .whereIn(FieldPath.documentId(), chunk)
+                                                            .get()
+                                                            .await()
+
+                                                        profiles.documents.forEach { profileDoc ->
+                                                            val profile = profileDoc.toObject(FirebaseUser::class.java)
+                                                            if (profile?.settings?.followersPostsNotifications == true) {
+                                                                val notification = FirebaseNotification(
+                                                                    recipientId = profileDoc.id,
+                                                                    senderId = user.uid,
+                                                                    senderName = senderName,
+                                                                    senderPhotoUrl = userProfile?.photoUrl,
+                                                                    type = NotificationType.NEW_POST,
+                                                                    targetId = postId,
+                                                                    title = "Nouveau parcours !",
+                                                                    message = "$senderName a publié un nouveau parcours : \"$postTitle\"."
+                                                                )
+                                                                db.collection("notifications").add(notification)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                Log.d("TravelWowApp", "Processed notifications for ${followersSnapshot.size()} followers")
+                                            } catch (e: Exception) {
+                                                Log.e("TravelWowApp", "Error notifying followers", e)
+                                            }
                                         }
                                         
                                         showPostSuccessDialog = true
