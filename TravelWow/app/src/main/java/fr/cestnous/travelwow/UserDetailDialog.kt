@@ -16,7 +16,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 @Composable
@@ -24,46 +27,53 @@ fun UserDetailDialog(
     userId: String,
     onDismiss: () -> Unit
 ) {
-    var userDetails by remember { mutableStateOf<fr.cestnous.travelwow.FirebaseUser?>(null) }
+    val auth = remember { Firebase.auth }
+    val currentUser = auth.currentUser
+    val db = remember { Firebase.firestore }
+    val coroutineScope = rememberCoroutineScope()
+
+    var userDetails by remember { mutableStateOf<FirebaseUser?>(null) }
     var userPostCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+    var isFollowing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(userId) {
+    LaunchedEffect(userId, currentUser?.uid) {
         try {
             Log.d("UserDetailDialog", "--- Loading User Details ---")
             Log.d("UserDetailDialog", "UserId: $userId")
             Log.d("UserDetailDialog", "Fetching user from Firestore: travelpath/$userId")
             
-            val db = Firebase.firestore
             val doc = db.collection("travelpath")
                 .document(userId)
                 .get()
                 .await()
             
             if (doc.exists()) {
-                userDetails = doc.toObject(fr.cestnous.travelwow.FirebaseUser::class.java)
-                Log.d("UserDetailDialog", "User data retrieved successfully")
-                Log.d("UserDetailDialog", "Username: ${userDetails?.username}")
-                Log.d("UserDetailDialog", "PhotoUrl: ${userDetails?.photoUrl}")
-                Log.d("UserDetailDialog", "Bio length: ${userDetails?.bio?.length ?: 0}")
-            } else {
-                Log.w("UserDetailDialog", "No document found in Firestore for userId: $userId")
+                userDetails = doc.toObject(FirebaseUser::class.java)
+            }
+
+            // Check if current user is following this user
+            if (currentUser != null && currentUser.uid != userId) {
+                val followDoc = db.collection("travelpath")
+                    .document(currentUser.uid)
+                    .collection("following")
+                    .document(userId)
+                    .get()
+                    .await()
+                isFollowing = followDoc.exists()
             }
 
             // Fetch post count
-            Log.d("UserDetailDialog", "Fetching post count for user...")
             val countSnapshot = db.collection("travelpath_posts")
                 .whereEqualTo("authorId", userId)
                 .get()
                 .await()
             userPostCount = countSnapshot.size()
-            Log.d("UserDetailDialog", "Found $userPostCount posts for user")
             
         } catch (e: Exception) {
-            Log.e("UserDetailDialog", "CRITICAL ERROR fetching user details for ID: $userId", e)
+            Log.e("UserDetailDialog", "Error fetching user details", e)
         } finally {
             isLoading = false
-            Log.d("UserDetailDialog", "--- Loading Finished ---")
         }
     }
 
@@ -136,6 +146,64 @@ fun UserDetailDialog(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
+                    }
+
+                    // Follow/Unfollow Button
+                    if (currentUser != null && currentUser.uid != userId) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        val myFollowingRef = db.collection("travelpath")
+                                            .document(currentUser.uid)
+                                            .collection("following")
+                                            .document(userId)
+                                        
+                                        val theirFollowersRef = db.collection("travelpath")
+                                            .document(userId)
+                                            .collection("followers")
+                                            .document(currentUser.uid)
+
+                                        if (isFollowing) {
+                                            // Unfollow
+                                            myFollowingRef.delete().await()
+                                            theirFollowersRef.delete().await()
+                                            
+                                            // Update counts
+                                            db.collection("travelpath").document(currentUser.uid)
+                                                .update("followingCount", FieldValue.increment(-1))
+                                            db.collection("travelpath").document(userId)
+                                                .update("followersCount", FieldValue.increment(-1))
+                                            
+                                            isFollowing = false
+                                            userDetails = userDetails?.copy(followersCount = (userDetails?.followersCount ?: 0) - 1)
+                                        } else {
+                                            // Follow
+                                            myFollowingRef.set(mapOf("timestamp" to FieldValue.serverTimestamp())).await()
+                                            theirFollowersRef.set(mapOf("timestamp" to FieldValue.serverTimestamp())).await()
+                                            
+                                            // Update counts
+                                            db.collection("travelpath").document(currentUser.uid)
+                                                .update("followingCount", FieldValue.increment(1))
+                                            db.collection("travelpath").document(userId)
+                                                .update("followersCount", FieldValue.increment(1))
+                                            
+                                            isFollowing = true
+                                            userDetails = userDetails?.copy(followersCount = (userDetails?.followersCount ?: 0) + 1)
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("UserDetailDialog", "Error toggling follow", e)
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isFollowing) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                                contentColor = if (isFollowing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+                        ) {
+                            Text(if (isFollowing) "Suivi(e)" else "Suivre")
+                        }
                     }
 
                     // Bio

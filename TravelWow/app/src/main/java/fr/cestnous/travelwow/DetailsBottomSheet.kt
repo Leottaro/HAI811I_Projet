@@ -335,6 +335,55 @@ fun DetailsBottomSheet(
                     ) {
                         item {
                             Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clickable {
+                                            selectedUserId = post.authorId
+                                            showUserDialog = true
+                                        }
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    if (post.authorPhotoUrl != null) {
+                                        AsyncImage(
+                                            model = post.authorPhotoUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                post.authorName.take(1).uppercase(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = post.authorName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Créateur du parcours",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+
                                 Text(
                                     text = post.title,
                                     style = MaterialTheme.typography.headlineMedium,
