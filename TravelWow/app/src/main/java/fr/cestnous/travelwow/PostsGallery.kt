@@ -20,9 +20,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.firebase.firestore.Query
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
@@ -212,6 +214,25 @@ fun PostMap(
             }
         } else {
             focusedPostSteps = emptyList()
+        }
+    }
+
+    LaunchedEffect(focusedPost, focusedPostSteps) {
+        if (focusedPost != null) {
+            try {
+                val builder = LatLngBounds.Builder()
+                builder.include(LatLng(focusedPost.latitude, focusedPost.longitude))
+                focusedPostSteps.forEach { step ->
+                    builder.include(LatLng(step.latitude, step.longitude))
+                }
+                val bounds = builder.build()
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngBounds(bounds, 150),
+                    durationMs = 1000
+                )
+            } catch (e: Exception) {
+                Log.e("PostMap", "Error zooming to bounds", e)
+            }
         }
     }
 
