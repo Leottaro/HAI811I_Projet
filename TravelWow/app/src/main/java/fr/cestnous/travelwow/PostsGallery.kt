@@ -65,8 +65,10 @@ fun PostsGallery(
         coroutineScope.launch {
             isRefreshing = true
             try {
-                Log.d("PostsGallery", "Fetching posts...")
+                Log.d("PostsGallery", "Fetching posts... mode: $viewMode")
                 
+                val limitCount = 50
+
                 if (favoritesUserId != null) {
                     Log.d("PostsGallery", "Fetching favorites for: $favoritesUserId")
                     
@@ -77,37 +79,74 @@ fun PostsGallery(
                         posts = cachedFavorites.map { it.toFirebasePost() }
                     }
 
-                    // Then fetch from Firestore to sync
-                    val snapshot = db.collection("users").document(favoritesUserId).collection("favorites").get().await()
-                    var firestorePosts = snapshot.toObjects(FirebasePost::class.java)
+                    // Fetch liked post IDs from the sub-collection, sorted by like date (createdAt)
+                    var likedQuery = db.collection("users").document(favoritesUserId)
+                        .collection("liked_posts")
+                        .orderBy("createdAt", Query.Direction.DESCENDING)
                     
-                    // Apply filters
-                    if (filter.selectedCategories.isNotEmpty()) {
-                        firestorePosts = firestorePosts.filter { it.categories.toSet().containsAll(filter.selectedCategories) }
+                    if (viewMode == GalleryViewMode.GRID) {
+                        likedQuery = likedQuery.limit(limitCount.toLong())
                     }
-                    firestorePosts = firestorePosts.filter { it.distanceKm >= filter.minDistance && it.distanceKm <= filter.maxDistance }
 
-                    // Update cache and state
-                    posts = firestorePosts.sortedByDescending { it.createdAt }
-                    
-                    coroutineScope.launch {
-                        // Sync cache with Firestore data
-                        val firestoreIds = firestorePosts.map { it.id }.toSet()
-                        
-                        // Add/Update from Firestore
-                        firestorePosts.forEach { post ->
-                            dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
+                    val likedPostsSnapshot = likedQuery.get().await()
+                    val likedPostIdsWithDate = likedPostsSnapshot.documents.map { 
+                        it.id to (it.getTimestamp("createdAt")?.toDate()?.time ?: 0L)
+                    }
+                    val likedPostIds = likedPostIdsWithDate.map { it.first }
+
+                    if (likedPostIds.isEmpty()) {
+                        posts = emptyList()
+                        coroutineScope.launch {
+                            dbLocal.favoritePostDao().clearAll()
                         }
+                    } else {
+                        // Fetch posts by IDs
+                        // Firestore whereIn has a limit of 30 items
+                        val firestorePosts = mutableListOf<FirebasePost>()
+                        likedPostIds.chunked(30).forEach { chunk ->
+                            val snapshot = db.collection("travelpath_posts")
+                                .whereIn(com.google.firebase.firestore.FieldPath.documentId(), chunk)
+                                .get()
+                                .await()
+                            firestorePosts.addAll(snapshot.toObjects(FirebasePost::class.java))
+                        }
+
+                        // Maintain the order of likedPostIds and attach likedAt
+                        val postWithLikes = likedPostIdsWithDate.mapNotNull { (id, likedAt) ->
+                            firestorePosts.find { it.id == id }?.let { it to likedAt }
+                        }
+
+                        var filteredPosts = postWithLikes.map { it.first }
+
+                        // Apply filters
+                        if (filter.selectedCategories.isNotEmpty()) {
+                            filteredPosts = filteredPosts.filter { it.categories.toSet().containsAll(filter.selectedCategories) }
+                        }
+                        filteredPosts = filteredPosts.filter { it.distanceKm >= filter.minDistance && it.distanceKm <= filter.maxDistance }
+
+                        posts = filteredPosts
                         
-                        // Remove what's no longer in Firestore
-                        cachedFavorites.forEach { cached ->
-                            if (!firestoreIds.contains(cached.id)) {
-                                dbLocal.favoritePostDao().deleteByPostId(cached.id)
+                        coroutineScope.launch {
+                            // Sync cache with Firestore data
+                            val firestoreIds = filteredPosts.map { it.id }.toSet()
+                            
+                            // Add/Update from Firestore
+                            postWithLikes.forEach { (post, likedAt) ->
+                                if (firestoreIds.contains(post.id)) {
+                                    dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, likedAt))
+                                }
+                            }
+                            
+                            // Remove what's no longer in Firestore (among liked posts)
+                            cachedFavorites.forEach { cached ->
+                                if (!firestoreIds.contains(cached.id)) {
+                                    dbLocal.favoritePostDao().deleteByPostId(cached.id)
+                                }
                             }
                         }
                     }
                 } else {
-                    val query: Query = if (userIdFilter != null) {
+                    var query: Query = if (userIdFilter != null) {
                         Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
                         db.collection("travelpath_posts").whereEqualTo("authorId", userIdFilter)
                     } else if (excludeUserId != null) {
@@ -117,7 +156,11 @@ fun PostsGallery(
                         db.collection("travelpath_posts")
                     }
 
-                    val snapshot = query.limit(50).get().await()
+                    if (viewMode == GalleryViewMode.GRID) {
+                        query = query.limit(limitCount.toLong())
+                    }
+
+                    val snapshot = query.get().await()
                     Log.d("PostsGallery", "Snapshot received with ${snapshot.size()} documents")
                     var fetchedPosts = snapshot.toObjects(FirebasePost::class.java)
                     
@@ -127,8 +170,21 @@ fun PostsGallery(
                     }
                     fetchedPosts = fetchedPosts.filter { it.distanceKm >= filter.minDistance && it.distanceKm <= filter.maxDistance }
 
-                    // Sort in memory to avoid index requirements for now
-                    fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
+                    // Sorting logic
+                    fetchedPosts = when {
+                        userIdFilter != null -> {
+                            // Profile screen: Sort by creation date
+                            fetchedPosts.sortedByDescending { it.createdAt }
+                        }
+                        viewMode == GalleryViewMode.GRID -> {
+                            // Main screen (or Search) in Grid: Random sort
+                            fetchedPosts.shuffled()
+                        }
+                        else -> {
+                            // Map mode or others: default to date
+                            fetchedPosts.sortedByDescending { it.createdAt }
+                        }
+                    }
 
                     if (searchQuery.isNotBlank()) {
                         fetchedPosts = fetchedPosts.filter {
@@ -138,7 +194,7 @@ fun PostsGallery(
                                     it.categories.any { it.contains(searchQuery, ignoreCase = true) }
                         }
                     }
-                    
+
                     posts = fetchedPosts
                 }
             } catch (e: Exception) {

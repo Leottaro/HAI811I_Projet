@@ -127,21 +127,26 @@ fun TravelWowApp(
                 TravelWowMessagingService.updateTokenInFirestore(user.uid, token)
             })
 
-            // Load Profile
-            val doc = db.collection("users").document(user.uid).get().await()
-            if (doc.exists()) {
-                userProfile = doc.toObject(FirebaseUser::class.java)
-            } else if (user.email != null) {
-                // Initialize profile if it doesn't exist
-                val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
-                    ?: user.email!!.substringBefore("@")
-                val initialProfile = FirebaseUser(
-                    id = user.uid,
-                    username = initialUsername,
-                    email = user.email!!,
-                )
-                db.collection("users").document(user.uid).set(initialProfile).await()
-                userProfile = initialProfile
+            // Load Profile and listen for changes
+            db.collection("users").document(user.uid).addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w("TravelWowApp", "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    userProfile = snapshot.toObject(FirebaseUser::class.java)
+                } else if (userProfile == null && user.email != null) {
+                    // Initialize profile if it doesn't exist (one-time)
+                    val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
+                        ?: user.email!!.substringBefore("@")
+                    val initialProfile = FirebaseUser(
+                        id = user.uid,
+                        username = initialUsername,
+                        email = user.email!!,
+                    )
+                    db.collection("users").document(user.uid).set(initialProfile)
+                }
             }
 
             // Load Post Count

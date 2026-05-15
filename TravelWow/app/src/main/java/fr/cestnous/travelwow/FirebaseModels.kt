@@ -22,6 +22,15 @@ data class FirebaseUser(
 )
 
 /**
+ * Model representing a Liked Post for a user.
+ * Path: /users/{userId}/liked_posts/{postId}
+ */
+data class FirebaseLikedPost(
+    @DocumentId val id: String = "",
+    val createdAt: Timestamp = Timestamp.now()
+)
+
+/**
  * Model representing user preferences and settings.
  */
 data class FirebaseUserSettings(
@@ -82,17 +91,6 @@ data class FirebaseComment(
 )
 
 /**
- * Model for user interactions (Like/Follow)
- */
-data class FirebaseInteraction(
-    @DocumentId val id: String = "",
-    val type: InteractionType = InteractionType.LIKE,
-    val fromUserId: String = "",
-    val targetId: String = "", // PostId or UserId
-    val timestamp: Timestamp = Timestamp.now()
-)
-
-/**
  * Model for reporting content.
  */
 data class FirebaseReport(
@@ -105,8 +103,8 @@ data class FirebaseReport(
     val timestamp: Timestamp = Timestamp.now()
 )
 
-enum class InteractionType {
-    LIKE, FOLLOW, BOOKMARK
+enum class NotificationType {
+    FOLLOW, LIKE, COMMENT, NEW_POST, SHARE_POST
 }
 
 /**
@@ -126,10 +124,6 @@ data class FirebaseNotification(
     val isRead: Boolean = false,
     val createdAt: Timestamp = Timestamp.now()
 )
-
-enum class NotificationType {
-    FOLLOW, LIKE, COMMENT, NEW_POST, SHARE_POST
-}
 
 /**
  * Model representing filters for posts.

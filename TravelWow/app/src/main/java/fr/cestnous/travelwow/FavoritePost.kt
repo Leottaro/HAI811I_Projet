@@ -19,6 +19,7 @@ data class FavoritePost(
     val likesCount: Int,
     val commentsCount: Int,
     val createdAt: Long, // Store as timestamp millis
+    val likedAt: Long = 0L, // Store when the post was liked for sorting
     val categories: List<String> = emptyList()
 ) {
     fun toFirebasePost(): FirebasePost {
@@ -41,7 +42,7 @@ data class FavoritePost(
     }
 
     companion object {
-        fun fromFirebasePost(post: FirebasePost): FavoritePost {
+        fun fromFirebasePost(post: FirebasePost, likedAt: Long = 0L): FavoritePost {
             return FavoritePost(
                 id = post.id,
                 authorId = post.authorId,
@@ -56,6 +57,7 @@ data class FavoritePost(
                 likesCount = post.likesCount,
                 commentsCount = post.commentsCount,
                 createdAt = post.createdAt.toDate().time,
+                likedAt = likedAt,
                 categories = post.categories
             )
         }
@@ -64,7 +66,7 @@ data class FavoritePost(
 
 @Dao
 interface FavoritePostDao {
-    @Query("SELECT * FROM favorite_posts ORDER BY createdAt DESC")
+    @Query("SELECT * FROM favorite_posts ORDER BY likedAt DESC")
     suspend fun getAllFavorites(): List<FavoritePost>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -96,7 +98,7 @@ class Converters {
     }
 }
 
-@Database(entities = [FavoritePost::class, LocalDraft::class], version = 3, exportSchema = false)
+@Database(entities = [FavoritePost::class, LocalDraft::class], version = 4, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class TravelWowDatabase : RoomDatabase() {
     abstract fun favoritePostDao(): FavoritePostDao
