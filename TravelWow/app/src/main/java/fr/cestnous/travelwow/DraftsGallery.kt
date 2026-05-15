@@ -49,6 +49,7 @@ fun DraftsGallery(
                 val steps = stepsData.map { stepMap ->
                     FirebaseStep(
                         name = stepMap["name"] as? String ?: "",
+                        category = stepMap["category"] as? String ?: "",
                         latitude = stepMap["latitude"] as? Double ?: 0.0,
                         longitude = stepMap["longitude"] as? Double ?: 0.0,
                         imageUrls = stepMap["images"] as? List<String> ?: emptyList()

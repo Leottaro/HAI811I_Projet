@@ -58,6 +58,7 @@ import kotlin.math.roundToInt
 data class TravelStep(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
+    val category: String = "",
     val latitude: Double,
     val longitude: Double,
     val images: List<String> = emptyList()
@@ -253,6 +254,14 @@ fun CreatePostContent(
 
 @Composable
 fun StepItem(step: TravelStep, onRemove: () -> Unit) {
+    val categoryIcon = when (step.category) {
+        "Restauration" -> Icons.Default.Restaurant
+        "Loisirs" -> Icons.Default.Hiking
+        "Découvertes" -> Icons.Default.Explore
+        "Culture" -> Icons.Default.AccountBalance
+        else -> null
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -263,15 +272,40 @@ fun StepItem(step: TravelStep, onRemove: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_pin),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (categoryIcon != null) {
+                    Icon(
+                        imageVector = categoryIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_pin),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        if (step.category.isNotBlank()) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = step.category,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = "Lat: ${"%.4f".format(step.latitude)}, Lon: ${"%.4f".format(step.longitude)}",
                         style = MaterialTheme.typography.bodySmall,

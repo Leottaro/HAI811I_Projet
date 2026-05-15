@@ -1,6 +1,9 @@
 package fr.cestnous.travelwow
 
 import android.util.Log
+import kotlin.math.*
+
+// ... (existing imports)
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -58,6 +61,35 @@ suspend fun uploadToCloudinary(uri: String, context: android.content.Context): S
             override fun onReschedule(requestId: String, error: ErrorInfo) {}
         })
         .dispatch(context)
+}
+
+/**
+ * Calculates the great-circle distance between two points in kilometers.
+ * Uses the Haversine formula.
+ */
+fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371 // Earth's radius in km
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2).pow(2) +
+            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+            sin(dLon / 2).pow(2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return r * c
+}
+
+/**
+ * Calculates the total distance of a path defined by a list of steps.
+ */
+fun calculateTotalDistance(steps: List<TravelStep>): Double {
+    if (steps.size < 2) return 0.0
+    var total = 0.0
+    for (i in 0 until steps.size - 1) {
+        val s1 = steps[i]
+        val s2 = steps[i + 1]
+        total += calculateDistance(s1.latitude, s1.longitude, s2.latitude, s2.longitude)
+    }
+    return total
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -191,6 +223,7 @@ fun TravelWowApp(
 
     // State for AddStepScreen
     var currentStepName by remember { mutableStateOf("") }
+    var currentStepCategory by remember { mutableStateOf("") }
     var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
     var currentStepLocation by remember { mutableStateOf(com.google.android.gms.maps.model.LatLng(43.6107, 3.8767)) }
     
@@ -204,6 +237,7 @@ fun TravelWowApp(
         if (showAddStep) {
             showAddStep = false
             currentStepName = ""
+            currentStepCategory = ""
             currentStepImages = emptyList()
         } else if (showCreatePost) {
             showCreatePost = false
@@ -282,11 +316,13 @@ fun TravelWowApp(
                                 showAddStep = false
                                 // Reset step state when going back
                                 currentStepName = ""
+                                currentStepCategory = ""
                                 currentStepImages = emptyList()
                             },
                             onConfirmStepClick = {
                                 postSteps = postSteps + TravelStep(
                                     name = currentStepName.ifBlank { "Étape sans nom" },
+                                    category = currentStepCategory,
                                     latitude = currentStepLocation.latitude,
                                     longitude = currentStepLocation.longitude,
                                     images = currentStepImages
@@ -294,6 +330,7 @@ fun TravelWowApp(
                                 showAddStep = false
                                 // Reset step state
                                 currentStepName = ""
+                                currentStepCategory = ""
                                 currentStepImages = emptyList()
                             },
                             canConfirmStep = currentStepName.isNotBlank(),
@@ -322,6 +359,7 @@ fun TravelWowApp(
                                             FirebaseStep(
                                                 id = step.id,
                                                 name = step.name,
+                                                category = step.category,
                                                 latitude = step.latitude,
                                                 longitude = step.longitude,
                                                 imageUrls = stepImageUrls,
@@ -332,6 +370,7 @@ fun TravelWowApp(
                                         val postRef = db.collection("travelpath_posts").document()
                                         val postId = postRef.id
 
+                                        val totalDistance = calculateTotalDistance(postSteps)
                                         val post = FirebasePost(
                                             id = postId,
                                             authorId = user.uid,
@@ -343,7 +382,7 @@ fun TravelWowApp(
                                             mainImageUrl = firebaseSteps.firstOrNull()!!.imageUrls.firstOrNull(),
                                             latitude = firebaseSteps.firstOrNull()!!.latitude,
                                             longitude = firebaseSteps.firstOrNull()!!.longitude,
-                                            distanceKm = 0.0,
+                                            distanceKm = (totalDistance * 10).roundToInt() / 10.0,
                                             durationMinutes = 0,
                                             steps = firebaseSteps,
                                             tags = List(0) { "" },
@@ -354,6 +393,7 @@ fun TravelWowApp(
                                         // Save steps to sub-collection
                                         val stepsCollection = postRef.collection("steps")
                                         firebaseSteps.forEach { firebaseStep ->
+                                            Log.i("TRUC", firebaseStep.toString());
                                             stepsCollection.document(firebaseStep.id).set(firebaseStep).await()
                                         }
 
@@ -537,6 +577,8 @@ fun TravelWowApp(
                                         AddStepScreen(
                                             stepName = currentStepName,
                                             onStepNameChange = { currentStepName = it },
+                                            stepCategory = currentStepCategory,
+                                            onStepCategoryChange = { currentStepCategory = it },
                                             stepImages = currentStepImages,
                                             onStepImagesChange = { currentStepImages = it },
                                             onLocationSelected = { currentStepLocation = it },
@@ -568,6 +610,7 @@ fun TravelWowApp(
                                                             "steps" to postSteps.map { step ->
                                                                 hashMapOf(
                                                                     "name" to step.name,
+                                                                    "category" to step.category,
                                                                     "latitude" to step.latitude,
                                                                     "longitude" to step.longitude,
                                                                     "images" to step.images
@@ -707,6 +750,7 @@ fun TravelWowApp(
                                                     postSteps = draft.steps.map { s -> 
                                                         TravelStep(
                                                             name = s.name,
+                                                            category = s.category,
                                                             latitude = s.latitude,
                                                             longitude = s.longitude,
                                                             images = s.imageUrls

@@ -86,9 +86,7 @@ suspend fun fetchRouteInfo(origin: LatLng, destination: LatLng): String? = withC
             if (routes != null && routes.length() > 0) {
                 val route = routes.getJSONObject(0)
                 val distance = route.optInt("distanceMeters") / 1000.0
-                val durationStr = route.optString("duration", "0s")
-                val durationMin = durationStr.removeSuffix("s").toLongOrNull()?.let { it / 60 } ?: 0
-                return@withContext "Distance: %.1f km • Durée: %d min".format(distance, durationMin)
+                return@withContext "Distance: %.1f km".format(distance)
             }
         }
     } catch (e: Exception) {
@@ -152,6 +150,8 @@ suspend fun fetchWikidataPhotos(lat: Double, lng: Double, name: String): List<St
 fun AddStepScreen(
     stepName: String,
     onStepNameChange: (String) -> Unit,
+    stepCategory: String,
+    onStepCategoryChange: (String) -> Unit,
     stepImages: List<String>,
     onStepImagesChange: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
@@ -176,6 +176,13 @@ fun AddStepScreen(
     }
 
     var currentPoiPhotos by remember { mutableStateOf(emptyList<String>()) }
+
+    val categories = listOf(
+        "Restauration" to Icons.Default.Restaurant,
+        "Loisirs" to Icons.Default.Hiking,
+        "Découvertes" to Icons.Default.Explore,
+        "Culture" to Icons.Default.AccountBalance
+    )
 
     // Helper to get photos using free Wikidata + loremflickr fallback
     fun updatePoiPhotos(latLng: LatLng, name: String) {
@@ -255,6 +262,30 @@ fun AddStepScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         )
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Catégorie", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(categories) { (name, icon) ->
+                    FilterChip(
+                        selected = stepCategory == name,
+                        onClick = { onStepCategoryChange(name) },
+                        label = { Text(name) },
+                        leadingIcon = {
+                            Icon(
+                                icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            }
+        }
 
         // Search for Google Maps points
         OutlinedTextField(

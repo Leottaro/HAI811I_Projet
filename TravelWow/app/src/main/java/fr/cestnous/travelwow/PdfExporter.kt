@@ -60,7 +60,7 @@ object PdfExporter {
         canvas.drawText("Par ${post.authorName} • ${post.locationName}", MARGIN, currentY, metaPaint)
         currentY += 20f
         
-        canvas.drawText("${post.distanceKm} km • ${post.durationMinutes / 60}h ${post.durationMinutes % 60}min", MARGIN, currentY, metaPaint)
+        canvas.drawText("${"%.1f".format(post.distanceKm)} km", MARGIN, currentY, metaPaint)
         currentY += 30f
 
         // --- Description ---

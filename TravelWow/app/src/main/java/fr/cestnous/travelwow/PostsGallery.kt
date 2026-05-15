@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -216,7 +217,11 @@ fun PostGrid(
                 ) {
                     if (post.mainImageUrl != null) {
                         AsyncImage(
-                            model = post.mainImageUrl,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(post.mainImageUrl)
+                                .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                .crossfade(true)
+                                .build(),
                             contentDescription = post.title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop

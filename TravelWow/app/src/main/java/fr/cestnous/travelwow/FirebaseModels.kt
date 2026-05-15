@@ -63,6 +63,7 @@ data class FirebaseStep(
     @DocumentId val id: String = "",
     val name: String = "",
     val description: String = "",
+    val category: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
     val order: Int = 0, // Used for reordering logic

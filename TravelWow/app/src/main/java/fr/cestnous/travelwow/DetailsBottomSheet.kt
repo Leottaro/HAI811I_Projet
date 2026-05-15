@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -13,7 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
@@ -54,8 +56,9 @@ fun DetailsSheetContent(
     var showUserDialog by remember { mutableStateOf(false) }
     var selectedUserId by remember { mutableStateOf<String?>(null) }
     var showCommentDialog by remember { mutableStateOf(false) }
-    var showShareDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val coroutineScope = rememberCoroutineScope()
@@ -106,9 +109,25 @@ fun DetailsSheetContent(
 
     var steps by remember { mutableStateOf<List<FirebaseStep>>(emptyList()) }
     var previewComments by remember { mutableStateOf<List<FirebaseComment>>(emptyList()) }
+    var isStepsLoading by remember { mutableStateOf(false) }
+
+    val allImages = remember(post, steps) {
+        val stepImages = steps.flatMap { it.imageUrls }
+        if (stepImages.isEmpty() && post?.mainImageUrl != null) {
+            listOf(post.mainImageUrl)
+        } else {
+            stepImages
+        }
+    }
+    val pagerState = key(post?.id) {
+        rememberPagerState(
+            pageCount = { allImages.size.coerceAtLeast(1) }
+        )
+    }
 
     LaunchedEffect(post?.id) {
         if (post != null) {
+            isStepsLoading = true
             try {
                 // Fetch steps
                 val stepsSnapshot = db.collection("travelpath_posts").document(post.id)
@@ -117,6 +136,11 @@ fun DetailsSheetContent(
                     .get()
                     .await()
                 steps = stepsSnapshot.toObjects(FirebaseStep::class.java)
+                Log.d("DetailsBottomSheet", "Fetched ${steps.size} steps for post ${post.id}")
+                steps.forEachIndexed { index, step ->
+                    Log.d("DetailsBottomSheet", "Step $index: ${step.name}, Images: ${step.imageUrls.size}")
+                }
+                isStepsLoading = false
 
                 // Fetch a preview of comments (last 3)
                 db.collection("travelpath_posts").document(post.id)
@@ -226,11 +250,54 @@ fun DetailsSheetContent(
         )
     }
 
-    if (showShareDialog && post != null) {
-        SharePostDialog(
-            post = post,
-            onDismiss = { showShareDialog = false },
-            currentUserProfile = currentUserProfile
+    if (showDeleteDialog && post != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Supprimer le parcours") },
+            text = { Text("Êtes-vous sûr de vouloir supprimer ce parcours ? Cette action est irréversible.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isDeleting = true
+                        coroutineScope.launch {
+                            try {
+                                // Delete steps sub-collection
+                                val stepsSnapshot = db.collection("travelpath_posts").document(post.id)
+                                    .collection("steps").get().await()
+                                stepsSnapshot.documents.forEach { it.reference.delete() }
+
+                                // Delete comments sub-collection
+                                val commentsSnapshot = db.collection("travelpath_posts").document(post.id)
+                                    .collection("comments").get().await()
+                                commentsSnapshot.documents.forEach { it.reference.delete() }
+
+                                // Delete the post document
+                                db.collection("travelpath_posts").document(post.id).delete().await()
+
+                                isDeleting = false
+                                showDeleteDialog = false
+                                onDismissRequest() // Close the bottom sheet
+                            } catch (e: Exception) {
+                                Log.e("DetailsBottomSheet", "Error deleting post", e)
+                                isDeleting = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    enabled = !isDeleting
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onError)
+                    } else {
+                        Text("Supprimer")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }, enabled = !isDeleting) {
+                    Text("Annuler")
+                }
+            }
         )
     }
 
@@ -460,7 +527,7 @@ fun DetailsSheetContent(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "${post.locationName} • ${post.distanceKm} km • ${post.durationMinutes / 60}h",
+                                    text = "${post.locationName} • ${"%.1f".format(post.distanceKm)} km",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -468,8 +535,6 @@ fun DetailsSheetContent(
                         }
 
                         item {
-                            val allImages = steps.flatMap { it.imageUrls }
-                            val pagerState = rememberPagerState(pageCount = { allImages.size.coerceAtLeast(1) })
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -477,61 +542,79 @@ fun DetailsSheetContent(
                                     .padding(horizontal = 16.dp)
                                     .clip(RoundedCornerShape(24.dp))
                             ) {
-                                HorizontalPager(
-                                    state = pagerState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    pageSpacing = 12.dp
-                                ) { page ->
+                                if (isStepsLoading) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .background(MaterialTheme.colorScheme.surfaceVariant),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        if (allImages.isNotEmpty()) {
-                                            AsyncImage(
-                                                model = allImages[page],
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(R.drawable.ic_map),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(48.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                            )
+                                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                                    }
+                                } else {
+                                    HorizontalPager(
+                                        state = pagerState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        pageSpacing = 12.dp
+                                    ) { page ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (allImages.isNotEmpty()) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(allImages[page])
+                                                        .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop,
+                                                    onError = { error ->
+                                                        Log.e("DetailsBottomSheet", "Error loading image at page $page (${allImages[page]}): ${error.result.throwable}")
+                                                    }
+                                                )
+                                            } else {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_map),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(48.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                
-                                if (allImages.size > 1) {
-                                    Row(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .padding(bottom = 16.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                                                CircleShape
-                                            )
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        repeat(allImages.size) { index ->
-                                            val active = pagerState.currentPage == index
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(if (active) 10.dp else 6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(
-                                                        if (active) MaterialTheme.colorScheme.primary
-                                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                            alpha = 0.3f
+                                    
+                                    if (allImages.size > 1) {
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(bottom = 16.dp)
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                                    CircleShape
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            repeat(allImages.size) { index ->
+                                                val active = pagerState.currentPage == index
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(if (active) 10.dp else 6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(
+                                                            if (active) MaterialTheme.colorScheme.primary
+                                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                                alpha = 0.3f
+                                                            )
                                                         )
-                                                    )
-                                                    .align(Alignment.CenterVertically)
-                                            )
+                                                        .align(Alignment.CenterVertically)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -650,6 +733,8 @@ fun DetailsSheetContent(
                         )
                     }
 
+                    val isAuthor = currentUser?.uid == post.authorId
+
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -693,93 +778,97 @@ fun DetailsSheetContent(
                             }
                         }
 
-                        IconButton(
-                            onClick = { showShareDialog = true },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_switch),
-                                contentDescription = "Partager",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        if (isAuthor) {
+                            IconButton(
+                                onClick = { showDeleteDialog = true },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Supprimer",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
 
-                        IconButton(
-                            onClick = {
-                                if (post != null && currentUser != null) {
-                                    val favoriteRef = db.collection("travelpath").document(currentUser.uid)
-                                        .collection("favorites").document(post.id)
-                                    val dbLocal = TravelWowDatabase.getDatabase(context)
-                                    
-                                    coroutineScope.launch {
-                                        try {
-                                            if (isFavorite) {
-                                                favoriteRef.delete().await()
-                                                dbLocal.favoritePostDao().deleteByPostId(post.id)
-                                                isFavorite = false
-                                            } else {
-                                                // We can store a summary of the post or just the reference
-                                                // Storing the whole post object for easier display in Favorites screen
-                                                favoriteRef.set(post).await()
-                                                dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
-                                                isFavorite = true
+                        if (!isAuthor) {
+                            IconButton(
+                                onClick = {
+                                    if (post != null && currentUser != null) {
+                                        val favoriteRef = db.collection("travelpath").document(currentUser.uid)
+                                            .collection("favorites").document(post.id)
+                                        val dbLocal = TravelWowDatabase.getDatabase(context)
+                                        
+                                        coroutineScope.launch {
+                                            try {
+                                                if (isFavorite) {
+                                                    favoriteRef.delete().await()
+                                                    dbLocal.favoritePostDao().deleteByPostId(post.id)
+                                                    isFavorite = false
+                                                } else {
+                                                    // We can store a summary of the post or just the reference
+                                                    // Storing the whole post object for easier display in Favorites screen
+                                                    favoriteRef.set(post).await()
+                                                    dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
+                                                    isFavorite = true
 
-                                                // Send Notification to Post Author (if not self)
-                                                if (post.authorId != currentUser.uid) {
-                                                    try {
-                                                        val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
-                                                        val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
-                                                        
-                                                        if (authorProfile?.settings?.likesNotifications == true) {
-                                                            val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
-                                                            val notification = FirebaseNotification(
-                                                                recipientId = post.authorId,
-                                                                senderId = currentUser.uid,
-                                                                senderName = senderName,
-                                                                senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
-                                                                type = NotificationType.LIKE,
-                                                                targetId = post.id,
-                                                                title = "Nouveau like !",
-                                                                message = "$senderName a aimé votre parcours \"${post.title}\"."
-                                                            )
-                                                            db.collection("notifications").add(notification)
+                                                    // Send Notification to Post Author (if not self)
+                                                    if (post.authorId != currentUser.uid) {
+                                                        try {
+                                                            val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
+                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+                                                            
+                                                            if (authorProfile?.settings?.likesNotifications == true) {
+                                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                                val notification = FirebaseNotification(
+                                                                    recipientId = post.authorId,
+                                                                    senderId = currentUser.uid,
+                                                                    senderName = senderName,
+                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                    type = NotificationType.LIKE,
+                                                                    targetId = post.id,
+                                                                    title = "Nouveau like !",
+                                                                    message = "$senderName a aimé votre parcours \"${post.title}\"."
+                                                                )
+                                                                db.collection("notifications").add(notification)
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            Log.e("DetailsBottomSheet", "Error sending like notification", e)
                                                         }
-                                                    } catch (e: Exception) {
-                                                        Log.e("DetailsBottomSheet", "Error sending like notification", e)
                                                     }
                                                 }
+                                            } catch (e: Exception) {
+                                                Log.e("DetailsBottomSheet", "Error updating favorites", e)
                                             }
-                                        } catch (e: Exception) {
-                                            Log.e("DetailsBottomSheet", "Error updating favorites", e)
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        ) {
-                            Icon(
-                                painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite),
-                                contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                                tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                                },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                            ) {
+                                Icon(
+                                    painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite),
+                                    contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                                    tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
 
-                        IconButton(
-                            onClick = { 
-                                reportTargetId = post.id
-                                reportTargetType = "post"
-                                showReportDialog = true 
-                            },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_warning),
-                                contentDescription = "Signaler",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                            IconButton(
+                                onClick = { 
+                                    reportTargetId = post.id
+                                    reportTargetType = "post"
+                                    showReportDialog = true 
+                                },
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_warning),
+                                    contentDescription = "Signaler",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
@@ -790,15 +879,74 @@ fun DetailsSheetContent(
 
 @Composable
 fun StepItemView(step: FirebaseStep) {
+    val categoryIcon = when (step.category) {
+        "Restauration" -> Icons.Default.Restaurant
+        "Loisirs" -> Icons.Default.Hiking
+        "Découvertes" -> Icons.Default.Explore
+        "Culture" -> Icons.Default.AccountBalance
+        else -> null
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (categoryIcon != null) {
+                    Icon(
+                        imageVector = categoryIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(text = step.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                if (step.category.isNotBlank()) {
+                    Spacer(Modifier.weight(1f))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = step.category,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
             if (step.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(text = step.description, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (step.imageUrls.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(end = 16.dp)
+                ) {
+                    items(step.imageUrls) { imageUrl ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imageUrl)
+                                .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            onError = { error ->
+                                Log.e("DetailsBottomSheet", "Error loading step image ($imageUrl): ${error.result.throwable}")
+                            }
+                        )
+                    }
+                }
             }
         }
     }
