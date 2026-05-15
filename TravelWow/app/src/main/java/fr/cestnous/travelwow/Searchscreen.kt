@@ -1,8 +1,14 @@
 package fr.cestnous.travelwow
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,8 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import fr.cestnous.travelwow.ui.theme.TravelWowTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +40,9 @@ fun SearchTopBar(
     onViewModeChange: (GalleryViewMode) -> Unit = {},
     onResetPost: () -> Unit = {},
     isPostSelected: Boolean = false,
-    onDeselect: () -> Unit = {}
+    onDeselect: () -> Unit = {},
+    onFilterClick: () -> Unit = {},
+    isFilterActive: Boolean = false
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -92,12 +102,22 @@ fun SearchTopBar(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                IconButton(onClick = { /* TODO */ }) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_filters),
-                                        contentDescription = "Filtres",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                IconButton(onClick = onFilterClick) {
+                                    Box {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_filters),
+                                            contentDescription = "Filtres",
+                                            tint = if (isFilterActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (isFilterActive) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                                    .align(Alignment.TopEnd)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -154,6 +174,126 @@ fun SearchTopBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FilterBottomSheetContent(
+    filter: PostFilter,
+    onFilterChange: (PostFilter) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val categories = listOf("Restauration", "Loisirs", "Découvertes", "Culture")
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Filtres",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Fermer")
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(
+            text = "Catégories",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(categories) { category ->
+                val isSelected = filter.selectedCategories.contains(category)
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        val newCategories = if (isSelected) {
+                            filter.selectedCategories - category
+                        } else {
+                            filter.selectedCategories + category
+                        }
+                        onFilterChange(filter.copy(selectedCategories = newCategories))
+                    },
+                    label = { Text(category) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Distance",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "${filter.minDistance.toInt()} - ${filter.maxDistance.toInt()} km",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        RangeSlider(
+            value = filter.minDistance..filter.maxDistance,
+            onValueChange = { range ->
+                onFilterChange(filter.copy(minDistance = range.start, maxDistance = range.endInclusive))
+            },
+            valueRange = 0f..100f,
+            steps = 20,
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(40.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    onFilterChange(PostFilter())
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Réinitialiser")
+            }
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Appliquer")
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onPostClick: (FirebasePost) -> Unit,
@@ -161,22 +301,46 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     excludeUserId: String? = null,
     searchQuery: String = "",
+    filter: PostFilter = PostFilter(),
+    onFilterChange: (PostFilter) -> Unit = {},
+    showFilterSheet: Boolean = false,
+    onShowFilterSheetChange: (Boolean) -> Unit = {},
     focusedPost: FirebasePost? = null,
     onFocusedPostChange: (FirebasePost?) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onEmptySpaceClick: () -> Unit = {}
 ) {
-    PostsGallery(
-        onPostClick = onPostClick,
-        viewMode = viewMode,
-        modifier = modifier,
-        excludeUserId = excludeUserId,
-        searchQuery = searchQuery,
-        focusedPost = focusedPost,
-        onFocusedPostChange = onFocusedPostChange,
-        contentPadding = contentPadding,
-        onEmptySpaceClick = onEmptySpaceClick
-    )
+    val sheetState = rememberModalBottomSheetState()
+    
+    Column(modifier = modifier.fillMaxSize()) {
+        PostsGallery(
+            onPostClick = onPostClick,
+            viewMode = viewMode,
+            modifier = Modifier.weight(1f),
+            excludeUserId = excludeUserId,
+            searchQuery = searchQuery,
+            filter = filter,
+            focusedPost = focusedPost,
+            onFocusedPostChange = onFocusedPostChange,
+            contentPadding = contentPadding,
+            onEmptySpaceClick = onEmptySpaceClick
+        )
+    }
+
+    if (showFilterSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { onShowFilterSheetChange(false) },
+            sheetState = sheetState,
+            dragHandle = null,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            FilterBottomSheetContent(
+                filter = filter,
+                onFilterChange = onFilterChange,
+                onDismiss = { onShowFilterSheetChange(false) }
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true, showSystemUi = true)

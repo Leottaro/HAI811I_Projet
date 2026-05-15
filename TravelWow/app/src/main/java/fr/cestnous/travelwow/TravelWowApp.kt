@@ -188,6 +188,11 @@ fun TravelWowApp(
     var showBottomSheet by remember { mutableStateOf(false) }
     var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
     
+    // Search Filter State
+    var postFilter by remember { mutableStateOf(PostFilter()) }
+    var showFilterSheet by remember { mutableStateOf(false) }
+    val isFilterActive = postFilter.selectedCategories.isNotEmpty() || postFilter.minDistance > 0f || postFilter.maxDistance < 100f
+
     // Create Post State
     var showCreatePost by remember { mutableStateOf(false) }
     var showAddStep by remember { mutableStateOf(false) }
@@ -401,7 +406,7 @@ fun TravelWowApp(
                                             distanceKm = (totalDistance * 10).roundToInt() / 10.0,
                                             durationMinutes = 0,
                                             steps = firebaseSteps,
-                                            tags = List(0) { "" },
+                                            categories = firebaseSteps.map { it.category }.filter { it.isNotBlank() }.distinct(),
                                         )
                                         
                                         postRef.set(post).await()
@@ -486,7 +491,9 @@ fun TravelWowApp(
                             viewMode = galleryViewMode,
                             onViewModeChange = { galleryViewMode = it },
                             isPostSelected = showBottomSheet,
-                            onDeselect = closeBottomSheet
+                            onDeselect = closeBottomSheet,
+                            onFilterClick = { showFilterSheet = true },
+                            isFilterActive = isFilterActive
                         )
                         AppDestinations.FAVORITES -> TopAppBar(
                             title = { Text(currentDestination.label) },
@@ -694,6 +701,10 @@ fun TravelWowApp(
                                             modifier = Modifier,
                                             excludeUserId = user.uid,
                                             searchQuery = searchQuery,
+                                            filter = postFilter,
+                                            onFilterChange = { postFilter = it },
+                                            showFilterSheet = showFilterSheet,
+                                            onShowFilterSheetChange = { showFilterSheet = it },
                                             focusedPost = focusedPostForMap,
                                             onFocusedPostChange = { post ->
                                                 focusedPostForMap = post

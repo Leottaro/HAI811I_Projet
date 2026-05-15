@@ -50,7 +50,7 @@ data class FirebasePost(
     val commentsCount: Int = 0,
     @get:com.google.firebase.firestore.Exclude val steps: List<FirebaseStep> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
-    val tags: List<String> = emptyList()
+    val categories: List<String> = emptyList()
 )
 
 /**
@@ -130,3 +130,12 @@ data class FirebaseNotification(
 enum class NotificationType {
     FOLLOW, LIKE, COMMENT, NEW_POST, SHARE_POST
 }
+
+/**
+ * Model representing filters for posts.
+ */
+data class PostFilter(
+    val selectedCategories: Set<String> = emptySet(),
+    val minDistance: Float = 0f,
+    val maxDistance: Float = 100f // Default max matches slider
+)

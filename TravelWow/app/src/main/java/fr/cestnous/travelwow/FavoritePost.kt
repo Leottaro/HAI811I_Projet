@@ -19,7 +19,7 @@ data class FavoritePost(
     val likesCount: Int,
     val commentsCount: Int,
     val createdAt: Long, // Store as timestamp millis
-    val tags: List<String> = emptyList()
+    val categories: List<String> = emptyList()
 ) {
     fun toFirebasePost(): FirebasePost {
         return FirebasePost(
@@ -36,7 +36,7 @@ data class FavoritePost(
             likesCount = likesCount,
             commentsCount = commentsCount,
             createdAt = Timestamp(Date(createdAt)),
-            tags = tags
+            categories = categories
         )
     }
 
@@ -56,7 +56,7 @@ data class FavoritePost(
                 likesCount = post.likesCount,
                 commentsCount = post.commentsCount,
                 createdAt = post.createdAt.toDate().time,
-                tags = post.tags
+                categories = post.categories
             )
         }
     }
@@ -96,7 +96,7 @@ class Converters {
     }
 }
 
-@Database(entities = [FavoritePost::class, LocalDraft::class], version = 2, exportSchema = false)
+@Database(entities = [FavoritePost::class, LocalDraft::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class TravelWowDatabase : RoomDatabase() {
     abstract fun favoritePostDao(): FavoritePostDao

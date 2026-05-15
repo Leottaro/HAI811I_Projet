@@ -49,6 +49,7 @@ fun PostsGallery(
     excludeUserId: String? = null,
     searchQuery: String = "",
     favoritesUserId: String? = null,
+    filter: PostFilter = PostFilter(),
     focusedPost: FirebasePost? = null,
     onFocusedPostChange: (FirebasePost?) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
@@ -78,8 +79,14 @@ fun PostsGallery(
 
                     // Then fetch from Firestore to sync
                     val snapshot = db.collection("users").document(favoritesUserId).collection("favorites").get().await()
-                    val firestorePosts = snapshot.toObjects(FirebasePost::class.java)
+                    var firestorePosts = snapshot.toObjects(FirebasePost::class.java)
                     
+                    // Apply filters
+                    if (filter.selectedCategories.isNotEmpty()) {
+                        firestorePosts = firestorePosts.filter { it.categories.toSet().containsAll(filter.selectedCategories) }
+                    }
+                    firestorePosts = firestorePosts.filter { it.distanceKm >= filter.minDistance && it.distanceKm <= filter.maxDistance }
+
                     // Update cache and state
                     posts = firestorePosts.sortedByDescending { it.createdAt }
                     
@@ -114,6 +121,12 @@ fun PostsGallery(
                     Log.d("PostsGallery", "Snapshot received with ${snapshot.size()} documents")
                     var fetchedPosts = snapshot.toObjects(FirebasePost::class.java)
                     
+                    // Apply filters
+                    if (filter.selectedCategories.isNotEmpty()) {
+                        fetchedPosts = fetchedPosts.filter { it.categories.toSet().containsAll(filter.selectedCategories) }
+                    }
+                    fetchedPosts = fetchedPosts.filter { it.distanceKm >= filter.minDistance && it.distanceKm <= filter.maxDistance }
+
                     // Sort in memory to avoid index requirements for now
                     fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
 
@@ -121,7 +134,8 @@ fun PostsGallery(
                         fetchedPosts = fetchedPosts.filter {
                             it.title.contains(searchQuery, ignoreCase = true) ||
                                     it.description?.contains(searchQuery, ignoreCase = true) == true ||
-                                    it.locationName.contains(searchQuery, ignoreCase = true)
+                                    it.locationName.contains(searchQuery, ignoreCase = true) ||
+                                    it.categories.any { it.contains(searchQuery, ignoreCase = true) }
                         }
                     }
                     
@@ -136,7 +150,7 @@ fun PostsGallery(
         }
     }
 
-    LaunchedEffect(searchQuery) {
+    LaunchedEffect(searchQuery, filter) {
         fetchPosts()
     }
 
