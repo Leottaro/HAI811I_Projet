@@ -16,13 +16,18 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -167,6 +173,9 @@ fun AddStepScreen(
     val coroutineScope = rememberCoroutineScope()
     val geocoder = remember { Geocoder(context, Locale.getDefault()) }
 
+    val scrollState = rememberScrollState()
+    var mapIsInteracting by remember { mutableStateOf(false) }
+
     // Default position (e.g., Montpellier)
     var selectedLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
     var routeInfo by remember { mutableStateOf<String?>(null) }
@@ -251,6 +260,7 @@ fun AddStepScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(scrollState, enabled = !mapIsInteracting)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -565,9 +575,17 @@ fun AddStepScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(400.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(pass = PointerEventPass.Initial)
+                        mapIsInteracting = true
+                        waitForUpOrCancellation(pass = PointerEventPass.Initial)
+                        mapIsInteracting = false
+                    }
+                }
         ) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),

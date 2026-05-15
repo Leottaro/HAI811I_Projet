@@ -238,6 +238,20 @@ fun TravelWowApp(
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
+    val closeBottomSheet = {
+        showBottomSheet = false
+        coroutineScope.launch {
+            try {
+                sheetState.partialExpand()
+            } catch (e: Exception) {
+                Log.e("TravelWowApp", "Error closing bottom sheet", e)
+            }
+            selectedPost = null
+            focusedPostForMap = null
+        }
+        Unit
+    }
+    
     // BackHandler to dismiss various states
     BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep || showSettings || showEditProfile) {
         if (showAddStep) {
@@ -257,9 +271,7 @@ fun TravelWowApp(
         } else if (showSettings) {
             showSettings = false
         } else if (showBottomSheet) {
-            showBottomSheet = false
-            selectedPost = null
-            focusedPostForMap = null
+            closeBottomSheet()
         }
     }
 
@@ -293,11 +305,7 @@ fun TravelWowApp(
             sheetContent = {
                 DetailsSheetContent(
                     post = selectedPost,
-                    onDismissRequest = {
-                        showBottomSheet = false
-                        selectedPost = null
-                        focusedPostForMap = null
-                    },
+                    onDismissRequest = closeBottomSheet,
                     sheetState = sheetState,
                     currentUserProfile = userProfile
                 )
@@ -478,21 +486,13 @@ fun TravelWowApp(
                             viewMode = galleryViewMode,
                             onViewModeChange = { galleryViewMode = it },
                             isPostSelected = showBottomSheet,
-                            onDeselect = {
-                                showBottomSheet = false
-                                selectedPost = null
-                                focusedPostForMap = null
-                            }
+                            onDeselect = closeBottomSheet
                         )
                         AppDestinations.FAVORITES -> TopAppBar(
                             title = { Text(currentDestination.label) },
                             navigationIcon = {
                                 if (showBottomSheet) {
-                                    IconButton(onClick = {
-                                        showBottomSheet = false
-                                        selectedPost = null
-                                        focusedPostForMap = null
-                                    }) {
+                                    IconButton(onClick = closeBottomSheet) {
                                         Icon(
                                             painter = painterResource(R.drawable.ic_return),
                                             contentDescription = "Retour"
@@ -698,16 +698,11 @@ fun TravelWowApp(
                                             onFocusedPostChange = { post ->
                                                 focusedPostForMap = post
                                                 if (post == null) {
-                                                    showBottomSheet = false
-                                                    selectedPost = null
+                                                    closeBottomSheet()
                                                 }
                                             },
                                             contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
-                                            onEmptySpaceClick = {
-                                                showBottomSheet = false
-                                                selectedPost = null
-                                                focusedPostForMap = null
-                                            }
+                                            onEmptySpaceClick = closeBottomSheet
                                         )
                                     }
                                 }
@@ -725,16 +720,11 @@ fun TravelWowApp(
                                         onFocusedPostChange = { post ->
                                             focusedPostForMap = post
                                             if (post == null) {
-                                                showBottomSheet = false
-                                                selectedPost = null
+                                                closeBottomSheet()
                                             }
                                         },
                                         contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
-                                        onEmptySpaceClick = {
-                                            showBottomSheet = false
-                                            selectedPost = null
-                                            focusedPostForMap = null
-                                        }
+                                        onEmptySpaceClick = closeBottomSheet
                                     )
                                 }
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
@@ -775,16 +765,11 @@ fun TravelWowApp(
                                                 onFocusedPostChange = { post ->
                                                     focusedPostForMap = post
                                                     if (post == null) {
-                                                        showBottomSheet = false
-                                                        selectedPost = null
+                                                        closeBottomSheet()
                                                     }
                                                 },
                                                 contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
-                                                onEmptySpaceClick = {
-                                                    showBottomSheet = false
-                                                    selectedPost = null
-                                                    focusedPostForMap = null
-                                                }
+                                                onEmptySpaceClick = closeBottomSheet
                                             )
                                         } else {
                                             DraftsGallery(
