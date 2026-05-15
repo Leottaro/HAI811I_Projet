@@ -38,6 +38,7 @@ import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.Timestamp
+import com.google.gson.Gson
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -104,10 +105,13 @@ fun TravelWowApp(
     
     var userProfile by remember { mutableStateOf<FirebaseUser?>(null) }
     var userPostCount by remember { mutableStateOf(0) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val db = remember { Firebase.firestore }
+    val localDb = remember { TravelWowDatabase.getDatabase(context) }
+    val draftDao = remember { localDb.draftDao() }
 
     // Load user profile and post count from Firestore
     LaunchedEffect(user.uid) {
@@ -194,6 +198,8 @@ fun TravelWowApp(
     var isSavingPost by remember { mutableStateOf(false) }
     var isSavingDraft by remember { mutableStateOf(false) }
     var showPostSuccessDialog by remember { mutableStateOf(false) }
+    var showDraftSuccessDialog by remember { mutableStateOf(false) }
+    var editingDraftId by remember { mutableStateOf<String?>(null) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -245,6 +251,7 @@ fun TravelWowApp(
             postLocation = ""
             postDescription = ""
             postSteps = emptyList()
+            editingDraftId = null
         } else if (showEditProfile) {
             showEditProfile = false
         } else if (showSettings) {
@@ -301,6 +308,8 @@ fun TravelWowApp(
                         when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
                             modifier = Modifier,
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
                             onAddClick = { showCreatePost = true },
                             onResetPost = {
                                 // Reset and close
@@ -309,6 +318,7 @@ fun TravelWowApp(
                                 postLocation = ""
                                 postDescription = ""
                                 postSteps = emptyList()
+                                editingDraftId = null
                             },
                             isAdding = showCreatePost,
                             isAddingStep = showAddStep,
@@ -377,7 +387,7 @@ fun TravelWowApp(
                                             title = postTitle,
                                             locationName = firebaseSteps.firstOrNull()!!.name,
                                             description = postDescription,
-                                            mainImageUrl = firebaseSteps.firstOrNull()!!.imageUrls.firstOrNull(),
+                                            mainImageUrl = firebaseSteps.flatMap { it.imageUrls }.firstOrNull(),
                                             latitude = firebaseSteps.firstOrNull()!!.latitude,
                                             longitude = firebaseSteps.firstOrNull()!!.longitude,
                                             distanceKm = (totalDistance * 10).roundToInt() / 10.0,
@@ -445,6 +455,19 @@ fun TravelWowApp(
                                         postLocation = ""
                                         postDescription = ""
                                         postSteps = emptyList()
+
+                                        // Delete draft if it was one
+                                        editingDraftId?.let { draftId ->
+                                            try {
+                                                db.collection("users").document(user.uid)
+                                                    .collection("drafts").document(draftId)
+                                                    .delete()
+                                                Log.d("TravelWowApp", "Draft $draftId deleted after publication")
+                                            } catch (e: Exception) {
+                                                Log.e("TravelWowApp", "Error deleting draft $draftId", e)
+                                            }
+                                            editingDraftId = null
+                                        }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                     } finally {
@@ -599,33 +622,57 @@ fun TravelWowApp(
                                                 isSavingDraft = true
                                                 coroutineScope.launch {
                                                     try {
-                                                        val draftRef = db.collection("users").document(user.uid)
-                                                            .collection("drafts").document()
+                                                        val draftId = editingDraftId ?: db.collection("users").document(user.uid)
+                                                            .collection("drafts").document().id
                                                         
-                                                        val draft = hashMapOf(
-                                                            "title" to postTitle,
-                                                            "description" to postDescription,
-                                                            "steps" to postSteps.map { step ->
-                                                                hashMapOf(
-                                                                    "name" to step.name,
-                                                                    "category" to step.category,
-                                                                    "latitude" to step.latitude,
-                                                                    "longitude" to step.longitude,
-                                                                    "images" to step.images
-                                                                )
-                                                            },
-                                                            "createdAt" to FieldValue.serverTimestamp()
+                                                        // Save to local DB first
+                                                        val localDraft = LocalDraft(
+                                                            id = draftId,
+                                                            userId = user.uid,
+                                                            title = postTitle,
+                                                            description = postDescription,
+                                                            stepsJson = Gson().toJson(postSteps),
+                                                            createdAt = System.currentTimeMillis(),
+                                                            isSynced = false
                                                         )
-                                                        draftRef.set(draft).await()
+                                                        draftDao.insertDraft(localDraft)
+
+                                                        // Try to save to Firestore
+                                                        try {
+                                                            val draftRef = db.collection("users").document(user.uid)
+                                                                .collection("drafts").document(draftId)
+                                                            
+                                                            val draftMap = hashMapOf(
+                                                                "title" to postTitle,
+                                                                "description" to postDescription,
+                                                                "steps" to postSteps.map { step ->
+                                                                    hashMapOf(
+                                                                        "name" to step.name,
+                                                                        "category" to step.category,
+                                                                        "latitude" to step.latitude,
+                                                                        "longitude" to step.longitude,
+                                                                        "images" to step.images
+                                                                    )
+                                                                },
+                                                                "createdAt" to FieldValue.serverTimestamp()
+                                                            )
+                                                            draftRef.set(draftMap).await()
+                                                            
+                                                            // Mark as synced if successful
+                                                            draftDao.insertDraft(localDraft.copy(isSynced = true))
+                                                        } catch (e: Exception) {
+                                                            Log.e("TravelWowApp", "Error syncing draft to Firestore, will stay local", e)
+                                                        }
                                                         
                                                         // Reset and close
                                                         showCreatePost = false
                                                         postTitle = ""
                                                         postDescription = ""
                                                         postSteps = emptyList()
+                                                        editingDraftId = null
                                                         
-                                                        // Show success message (maybe re-use dialog or a snackbar)
-                                                        showPostSuccessDialog = true 
+                                                        // Show success message
+                                                        showDraftSuccessDialog = true 
                                                     } catch (e: Exception) {
                                                         Log.e("TravelWowApp", "Error saving draft", e)
                                                     } finally {
@@ -645,6 +692,8 @@ fun TravelWowApp(
                                             },
                                             viewMode = galleryViewMode,
                                             modifier = Modifier,
+                                            excludeUserId = user.uid,
+                                            searchQuery = searchQuery,
                                             focusedPost = focusedPostForMap,
                                             onFocusedPostChange = { post ->
                                                 focusedPostForMap = post
@@ -740,9 +789,11 @@ fun TravelWowApp(
                                         } else {
                                             DraftsGallery(
                                                 userId = user.uid,
+                                                draftDao = draftDao,
                                                 modifier = Modifier.weight(1f),
                                                 onDraftClick = { draft ->
                                                     // Load draft into creation state
+                                                    editingDraftId = draft.id
                                                     postTitle = draft.title
                                                     postDescription = draft.description
                                                     postSteps = draft.steps.map { s -> 
@@ -770,6 +821,10 @@ fun TravelWowApp(
 
         if (showPostSuccessDialog) {
             PostSuccessDialog(onDismiss = { showPostSuccessDialog = false })
+        }
+
+        if (showDraftSuccessDialog) {
+            DraftSuccessDialog(onDismiss = { showDraftSuccessDialog = false })
         }
     }
 }

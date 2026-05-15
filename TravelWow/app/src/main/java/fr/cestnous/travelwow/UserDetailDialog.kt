@@ -45,7 +45,7 @@ fun UserDetailDialog(
         try {
             Log.d("UserDetailDialog", "--- Loading User Details ---")
             Log.d("UserDetailDialog", "UserId: $userId")
-            Log.d("UserDetailDialog", "Fetching user from Firestore: travelpath/$userId")
+            Log.d("UserDetailDialog", "Fetching user from Firestore: users/$userId")
             
             val doc = db.collection("users")
                 .document(userId)

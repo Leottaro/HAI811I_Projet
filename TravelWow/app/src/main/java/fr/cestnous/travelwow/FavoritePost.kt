@@ -96,10 +96,11 @@ class Converters {
     }
 }
 
-@Database(entities = [FavoritePost::class], version = 1, exportSchema = false)
+@Database(entities = [FavoritePost::class, LocalDraft::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class TravelWowDatabase : RoomDatabase() {
     abstract fun favoritePostDao(): FavoritePostDao
+    abstract fun draftDao(): DraftDao
 
     companion object {
         @Volatile
@@ -111,7 +112,9 @@ abstract class TravelWowDatabase : RoomDatabase() {
                     context.applicationContext,
                     TravelWowDatabase::class.java,
                     "travelwow_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration() // For development, we can wipe the DB if version changes
+                .build()
                 INSTANCE = instance
                 instance
             }

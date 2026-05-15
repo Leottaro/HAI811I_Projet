@@ -46,6 +46,8 @@ fun PostsGallery(
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
     userIdFilter: String? = null,
+    excludeUserId: String? = null,
+    searchQuery: String = "",
     favoritesUserId: String? = null,
     focusedPost: FirebasePost? = null,
     onFocusedPostChange: (FirebasePost?) -> Unit = {},
@@ -101,6 +103,9 @@ fun PostsGallery(
                     val query: Query = if (userIdFilter != null) {
                         Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
                         db.collection("travelpath_posts").whereEqualTo("authorId", userIdFilter)
+                    } else if (excludeUserId != null) {
+                        Log.d("PostsGallery", "Excluding userId: $excludeUserId")
+                        db.collection("travelpath_posts").whereNotEqualTo("authorId", excludeUserId)
                     } else {
                         db.collection("travelpath_posts")
                     }
@@ -111,6 +116,14 @@ fun PostsGallery(
                     
                     // Sort in memory to avoid index requirements for now
                     fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
+
+                    if (searchQuery.isNotBlank()) {
+                        fetchedPosts = fetchedPosts.filter {
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                                    it.description?.contains(searchQuery, ignoreCase = true) == true ||
+                                    it.locationName.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
                     
                     posts = fetchedPosts
                 }
@@ -123,7 +136,7 @@ fun PostsGallery(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(searchQuery) {
         fetchPosts()
     }
 
