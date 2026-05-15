@@ -1,6 +1,7 @@
 package fr.cestnous.travelwow
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -195,10 +196,26 @@ fun TravelWowApp(
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
-    // Auto-expand when bottom sheet is shown
-    LaunchedEffect(showBottomSheet) {
-        if (showBottomSheet) {
-            sheetState.expand()
+    // BackHandler to dismiss various states
+    BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep || showSettings || showEditProfile) {
+        if (showAddStep) {
+            showAddStep = false
+            currentStepName = ""
+            currentStepImages = emptyList()
+        } else if (showCreatePost) {
+            showCreatePost = false
+            postTitle = ""
+            postLocation = ""
+            postDescription = ""
+            postSteps = emptyList()
+        } else if (showEditProfile) {
+            showEditProfile = false
+        } else if (showSettings) {
+            showSettings = false
+        } else if (showBottomSheet) {
+            showBottomSheet = false
+            selectedPost = null
+            focusedPostForMap = null
         }
     }
 
@@ -279,6 +296,7 @@ fun TravelWowApp(
                             canConfirmStep = currentStepName.isNotBlank(),
                             canShare = postTitle.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost && !showAddStep,
                             onShareClick = {
+                                // ... (rest of onShareClick remains same)
                                 isSavingPost = true
                                 coroutineScope.launch {
                                     try {
@@ -394,10 +412,30 @@ fun TravelWowApp(
                                 }
                             },
                             viewMode = galleryViewMode,
-                            onViewModeChange = { galleryViewMode = it }
+                            onViewModeChange = { galleryViewMode = it },
+                            isPostSelected = showBottomSheet,
+                            onDeselect = {
+                                showBottomSheet = false
+                                selectedPost = null
+                                focusedPostForMap = null
+                            }
                         )
                         AppDestinations.FAVORITES -> TopAppBar(
                             title = { Text(currentDestination.label) },
+                            navigationIcon = {
+                                if (showBottomSheet) {
+                                    IconButton(onClick = {
+                                        showBottomSheet = false
+                                        selectedPost = null
+                                        focusedPostForMap = null
+                                    }) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_return),
+                                            contentDescription = "Retour"
+                                        )
+                                    }
+                                }
+                            },
                             actions = {
                                 IconButton(onClick = {
                                     val newMode = if (galleryViewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
@@ -568,7 +606,12 @@ fun TravelWowApp(
                                                     selectedPost = null
                                                 }
                                             },
-                                            contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
+                                            contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                                            onEmptySpaceClick = {
+                                                showBottomSheet = false
+                                                selectedPost = null
+                                                focusedPostForMap = null
+                                            }
                                         )
                                     }
                                 }
@@ -590,7 +633,12 @@ fun TravelWowApp(
                                                 selectedPost = null
                                             }
                                         },
-                                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
+                                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                                        onEmptySpaceClick = {
+                                            showBottomSheet = false
+                                            selectedPost = null
+                                            focusedPostForMap = null
+                                        }
                                     )
                                 }
                                 AppDestinations.PROFILE -> Box(modifier = Modifier.fillMaxSize()) {
@@ -635,7 +683,12 @@ fun TravelWowApp(
                                                         selectedPost = null
                                                     }
                                                 },
-                                                contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp)
+                                                contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                                                onEmptySpaceClick = {
+                                                    showBottomSheet = false
+                                                    selectedPost = null
+                                                    focusedPostForMap = null
+                                                }
                                             )
                                         } else {
                                             DraftsGallery(

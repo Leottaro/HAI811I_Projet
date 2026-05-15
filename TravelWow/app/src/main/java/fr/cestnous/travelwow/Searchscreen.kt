@@ -30,7 +30,9 @@ fun SearchTopBar(
     canShare: Boolean = false,
     viewMode: GalleryViewMode = GalleryViewMode.GRID,
     onViewModeChange: (GalleryViewMode) -> Unit = {},
-    onResetPost: () -> Unit = {}
+    onResetPost: () -> Unit = {},
+    isPostSelected: Boolean = false,
+    onDeselect: () -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -44,11 +46,12 @@ fun SearchTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // "+" / "Cancel" / "Back" Button
+                // "+" / "Cancel" / "Back" / "Return" Button
                 IconButton(
                     onClick = {
                         if (isAddingStep) onBackStepClick()
                         else if (isAdding) onResetPost()
+                        else if (isPostSelected) onDeselect()
                         else onAddClick()
                     },
                     modifier = Modifier
@@ -57,11 +60,10 @@ fun SearchTopBar(
                 ) {
                     Icon(
                         painter = painterResource(
-                            if (isAddingStep) R.drawable.ic_return 
-                            else if (isAdding) R.drawable.ic_return 
+                            if (isAddingStep || isAdding || isPostSelected) R.drawable.ic_return 
                             else R.drawable.ic_add
                         ),
-                        contentDescription = if (isAddingStep || isAdding) "Retour" else "Ajouter",
+                        contentDescription = if (isAddingStep || isAdding || isPostSelected) "Retour" else "Ajouter",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -159,7 +161,8 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     focusedPost: FirebasePost? = null,
     onFocusedPostChange: (FirebasePost?) -> Unit = {},
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    onEmptySpaceClick: () -> Unit = {}
 ) {
     PostsGallery(
         onPostClick = onPostClick,
@@ -167,7 +170,8 @@ fun SearchScreen(
         modifier = modifier,
         focusedPost = focusedPost,
         onFocusedPostChange = onFocusedPostChange,
-        contentPadding = contentPadding
+        contentPadding = contentPadding,
+        onEmptySpaceClick = onEmptySpaceClick
     )
 }
 

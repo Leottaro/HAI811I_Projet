@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -46,7 +47,8 @@ fun PostsGallery(
     favoritesUserId: String? = null,
     focusedPost: FirebasePost? = null,
     onFocusedPostChange: (FirebasePost?) -> Unit = {},
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    onEmptySpaceClick: () -> Unit = {}
 ) {
     val db = remember { Firebase.firestore }
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
@@ -103,6 +105,7 @@ fun PostsGallery(
                 PostGrid(
                     posts = posts,
                     onPostClick = onPostClick,
+                    onEmptySpaceClick = onEmptySpaceClick,
                     isLoading = isRefreshing
                 )
             }
@@ -124,6 +127,7 @@ fun PostGrid(
     posts: List<FirebasePost>,
     onPostClick: (FirebasePost) -> Unit,
     modifier: Modifier = Modifier,
+    onEmptySpaceClick: () -> Unit = {},
     isLoading: Boolean = false
 ) {
     if (isLoading && posts.isEmpty()) {
@@ -131,7 +135,15 @@ fun PostGrid(
             CircularProgressIndicator(modifier = Modifier.size(48.dp))
         }
     } else if (posts.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onEmptySpaceClick() },
+            contentAlignment = Alignment.Center
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     painter = painterResource(R.drawable.ic_map),
@@ -150,7 +162,12 @@ fun PostGrid(
     } else {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onEmptySpaceClick() },
             contentPadding = PaddingValues(1.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp),
             horizontalArrangement = Arrangement.spacedBy(1.dp)
