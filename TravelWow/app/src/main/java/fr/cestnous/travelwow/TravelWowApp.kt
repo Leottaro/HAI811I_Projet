@@ -261,7 +261,12 @@ fun TravelWowApp(
         }
         Unit
     }
-    
+
+    // Automatically deselect the post when the page changes
+    LaunchedEffect(currentDestination) {
+        closeBottomSheet()
+    }
+
     // BackHandler to dismiss various states
     BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep || showSettings || showEditProfile) {
         if (showAddStep) {

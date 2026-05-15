@@ -58,7 +58,291 @@ import kotlin.math.roundToInt
 import android.location.Geocoder
 
 // Geocoder is free for basic location search.
-// Routes API used for travel duration/distance (cheaper than Places API).
+// Routes API used for travel duration/distance.
+// Legacy Places API used for POI photos (Nearby Search + Place Details).
+
+// ── Category mapping ─────────────────────────────────────────────────────────
+
+/**
+ * Maps a list of legacy Google Places types to one of the four app categories.
+ * Returns null if no confident match is found (caller keeps current selection).
+ *
+ * Reference: https://developers.google.com/maps/documentation/places/web-service/supported_types
+ */
+fun inferCategory(types: List<String>): String? {
+    val restaurationTypes = setOf(
+        "restaurant", "cafe", "bakery", "bar", "food", "meal_takeaway",
+        "meal_delivery", "night_club", "liquor_store"
+    )
+    val cultureTypes = setOf(
+        "museum", "art_gallery", "library", "church", "hindu_temple",
+        "mosque", "synagogue", "place_of_worship"
+    )
+    val loisirsTypes = setOf(
+        "amusement_park", "aquarium", "bowling_alley", "casino",
+        "movie_theater", "spa", "stadium", "zoo", "park",
+        "campground", "gym", "golf_course"
+    )
+    val decouvertesTypes = setOf(
+        "point_of_interest", "natural_feature", "locality",
+        "tourist_attraction", "premise", "establishment"
+    )
+
+    // Higher-specificity buckets first; "establishment" / "point_of_interest"
+    // are very generic so they sit at the bottom as a last resort.
+    for (type in types) {
+        when (type) {
+            in restaurationTypes -> return "Restauration"
+            in cultureTypes      -> return "Culture"
+            in loisirsTypes      -> return "Loisirs"
+        }
+    }
+    // Only fall back to Découvertes if no specific type matched
+    for (type in types) {
+        if (type in decouvertesTypes) return "Découvertes"
+    }
+    return null
+}
+
+// ── Data class ───────────────────────────────────────────────────────────────
+
+data class PlaceInfo(
+    val name: String,
+    val photoUrls: List<String>,
+    val inferredCategory: String?
+)
+
+// ── Legacy Places API helper ─────────────────────────────────────────────────
+
+/**
+ * Fallback: New Places API (v1) Text Search.
+ * Used if Legacy Nearby Search is denied or restricted.
+ */
+suspend fun fetchPlaceDetailsNewApi(
+    query: String,
+    lat: Double,
+    lng: Double
+): PlaceInfo? = withContext(Dispatchers.IO) {
+    val apiKey = BuildConfig.MAPS_API_KEY
+    val url = URL("https://places.googleapis.com/v1/places:searchText")
+
+    try {
+        val conn = url.openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.setRequestProperty("Content-Type", "application/json")
+        conn.setRequestProperty("X-Goog-Api-Key", apiKey)
+
+        // Required headers for Android-restricted API keys
+        conn.setRequestProperty("X-Android-Package", "fr.cestnous.travelwow")
+        // Note: X-Android-Cert is also usually required if the key is restricted by fingerprint.
+        // For now we add the package name which is missing according to the error message.
+
+        // Field mask is mandatory in New API
+        conn.setRequestProperty("X-Goog-FieldMask", "places.id,places.displayName,places.types,places.photos")
+        conn.doOutput = true
+
+        val body = JSONObject().apply {
+            put("textQuery", query)
+            put("locationBias", JSONObject().apply {
+                put("circle", JSONObject().apply {
+                    put("center", JSONObject().apply {
+                        put("latitude", lat)
+                        put("longitude", lng)
+                    })
+                    put("radius", 500.0)
+                })
+            })
+        }
+
+        conn.outputStream.use { it.write(body.toString().toByteArray()) }
+
+        if (conn.responseCode == 200) {
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            val places = json.optJSONArray("places")
+
+            if (places != null && places.length() > 0) {
+                val place = places.getJSONObject(0)
+                val name = place.optJSONObject("displayName")?.optString("text") ?: query
+                val typesArr = place.optJSONArray("types")
+                val types = if (typesArr != null) {
+                    (0 until typesArr.length()).map { typesArr.getString(it) }
+                } else emptyList()
+
+                val photosArr = place.optJSONArray("photos")
+                val photoUrls = if (photosArr != null) {
+                    (0 until minOf(photosArr.length(), 6)).mapNotNull { i ->
+                        val photoName = photosArr.getJSONObject(i).optString("name")
+                        if (photoName.isNotBlank()) {
+                            // New API photo URL format: https://places.googleapis.com/v1/{name}/media?maxHeightPx=400&maxWidthPx=400&key=API_KEY
+                            "https://places.googleapis.com/v1/$photoName/media?maxWidthPx=800&key=$apiKey"
+                        } else null
+                    }
+                } else emptyList()
+
+                Log.d("PlacesAPI", "New API (v1) Success: $name")
+                return@withContext PlaceInfo(name, photoUrls, inferCategory(types))
+            } else {
+                Log.w("PlacesAPI", "New API (v1) No results for '$query'")
+            }
+        } else {
+            val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+            Log.e("PlacesAPI", "New API (v1) error ${conn.responseCode}: $err")
+        }
+    } catch (e: Exception) {
+        Log.e("PlacesAPI", "New API (v1) exception", e)
+    }
+    null
+}
+
+/**
+ * 1. Nearby Search – resolves the best matching place_id and types from
+ *    coordinates ± keyword. Does NOT rely on its photo_reference (capped at 1).
+ * 2. Place Details – always called to get up to 6 photo_reference tokens,
+ *    and to confirm the place name and types.
+ *
+ * Photo URLs use the Places Photo endpoint:
+ *   https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=REF&key=KEY
+ *
+ * Billing:
+ *  • Nearby Search          → $0.032 / request  (Basic Data SKU)
+ *  • Place Details (Basic)  → $0.017 / request  (always called)
+ *  • Place Photo            → $0.007 / photo
+ */
+suspend fun fetchPlaceDetails(
+    lat: Double,
+    lng: Double,
+    query: String
+): PlaceInfo = withContext(Dispatchers.IO) {
+
+    val apiKey = BuildConfig.MAPS_API_KEY
+    val fallbackName = query.ifBlank { "Lieu sélectionné" }
+
+    // ── Step 1: Nearby Search — resolve place_id + types from coordinates ─────
+    // We only need place_id and types here; photos come from Details (Step 2)
+    // because Nearby Search caps photo_reference at 1 per result, while
+    // Place Details returns up to 10.
+    val keywordParam = if (query.isNotBlank()) "&keyword=${Uri.encode(query)}" else ""
+    val nearbyUrl = URL(
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
+                "?location=$lat,$lng" +
+                "&radius=500" +
+                keywordParam +
+                "&key=$apiKey"
+    )
+
+    var placeName = fallbackName
+    var placeTypes: List<String> = emptyList()
+    var photoReferences: List<String> = emptyList()
+    var placeId: String? = null
+
+    try {
+        val conn = nearbyUrl.openConnection() as HttpURLConnection
+        conn.requestMethod = "GET"
+
+        if (conn.responseCode == 200) {
+            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            val results = json.optJSONArray("results")
+
+            if (results != null && results.length() > 0) {
+                val place = results.getJSONObject(0)
+                placeId   = place.optString("place_id").takeIf { it.isNotBlank() }
+                placeName = place.optString("name").ifBlank { fallbackName }
+
+                val typesArr = place.optJSONArray("types")
+                if (typesArr != null) {
+                    placeTypes = (0 until typesArr.length()).map { typesArr.getString(it) }
+                }
+
+                Log.d("PlacesAPI", "Nearby: $placeName (id=$placeId) | types=$placeTypes")
+            } else {
+                val status = json.optString("status")
+                val errorMsg = json.optString("error_message")
+                Log.w("PlacesAPI", "Nearby Search 0 results for '$query' (status=$status, message=$errorMsg)")
+
+                if (status == "REQUEST_DENIED") {
+                    Log.i("PlacesAPI", "Nearby Search denied. Attempting fallback to New API (v1)...")
+                    val fallbackInfo = fetchPlaceDetailsNewApi(query, lat, lng)
+                    if (fallbackInfo != null) return@withContext fallbackInfo
+                }
+            }
+        } else {
+            val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+            Log.e("PlacesAPI", "Nearby Search error ${conn.responseCode}: $err")
+        }
+    } catch (e: Exception) {
+        Log.e("PlacesAPI", "Nearby Search exception", e)
+    }
+
+    // ── Step 2: Place Details — always fetch the full photo list ────────────
+    // Nearby Search returns at most 1 photo_reference; Details returns up to 10.
+    // We also re-request name+types here in case Nearby Search found nothing.
+    if (placeId != null) {
+        try {
+            val detailsUrl = URL(
+                "https://maps.googleapis.com/maps/api/place/details/json" +
+                        "?place_id=$placeId" +
+                        "&fields=name,types,photos" +
+                        "&key=$apiKey"
+            )
+            val conn = detailsUrl.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+
+            if (conn.responseCode == 200) {
+                val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                val result = json.optJSONObject("result")
+
+                if (result != null) {
+                    // Prefer the Details name (often more complete/correct)
+                    result.optString("name").takeIf { it.isNotBlank() }?.let { placeName = it }
+
+                    // Fill types if Nearby gave us none
+                    if (placeTypes.isEmpty()) {
+                        val typesArr = result.optJSONArray("types")
+                        if (typesArr != null) {
+                            placeTypes = (0 until typesArr.length()).map { typesArr.getString(it) }
+                        }
+                    }
+
+                    val photosArr = result.optJSONArray("photos")
+                    if (photosArr != null) {
+                        photoReferences = (0 until minOf(photosArr.length(), 6))
+                            .mapNotNull {
+                                photosArr.getJSONObject(it)
+                                    .optString("photo_reference")
+                                    .takeIf { r -> r.isNotBlank() }
+                            }
+                    }
+
+                    Log.d("PlacesAPI", "Details: $placeName | photos=${photoReferences.size}")
+                } else {
+                    val status = json.optString("status")
+                    val errorMsg = json.optString("error_message")
+                    Log.w("PlacesAPI", "Place Details 0 results (status=$status, message=$errorMsg)")
+                }
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }
+                Log.e("PlacesAPI", "Place Details error ${conn.responseCode}: $err")
+            }
+        } catch (e: Exception) {
+            Log.e("PlacesAPI", "Place Details exception", e)
+        }
+    }
+
+    // ── Build photo URLs ─────────────────────────────────────────────────────
+    val photoUrls = photoReferences.map { ref ->
+        "https://maps.googleapis.com/maps/api/place/photo" +
+                "?maxwidth=800&photo_reference=$ref&key=$apiKey"
+    }
+
+    PlaceInfo(
+        name = placeName,
+        photoUrls = photoUrls,
+        inferredCategory = inferCategory(placeTypes)
+    )
+}
+
+// ── Routes API helper (unchanged) ────────────────────────────────────────────
 
 suspend fun fetchRouteInfo(origin: LatLng, destination: LatLng): String? = withContext(Dispatchers.IO) {
     val apiKey = BuildConfig.MAPS_API_KEY
@@ -93,7 +377,12 @@ suspend fun fetchRouteInfo(origin: LatLng, destination: LatLng): String? = withC
                 val route = routes.getJSONObject(0)
                 val distance = route.optInt("distanceMeters") / 1000.0
                 return@withContext "Distance: %.1f km".format(distance)
+            } else {
+                Log.w("RoutesAPI", "No routes found: $response")
             }
+        } else {
+            val err = connection.errorStream?.bufferedReader()?.use { it.readText() }
+            Log.e("RoutesAPI", "Routes API error ${connection.responseCode}: $err")
         }
     } catch (e: Exception) {
         Log.e("RoutesAPI", "Error fetching route", e)
@@ -101,56 +390,7 @@ suspend fun fetchRouteInfo(origin: LatLng, destination: LatLng): String? = withC
     null
 }
 
-suspend fun fetchWikidataPhotos(lat: Double, lng: Double, name: String): List<String> = withContext(Dispatchers.IO) {
-    val cleanName = name.substringBefore("(").trim().lowercase()
-    val radius = if (cleanName.isNotEmpty()) "0.8" else "0.5" // Reduced radius for better relevance
-    
-    val query = """
-        SELECT DISTINCT ?item ?image ?label ?dist WHERE {
-          ?item wdt:P18 ?image .
-          ?item rdfs:label ?label .
-          FILTER(LANG(?label) = "fr" || LANG(?label) = "en")
-          SERVICE wikibase:around {
-            ?item wdt:P625 ?location .
-            bd:serviceParam wikibase:center "Point($lng $lat)"^^geo:wktLiteral .
-            bd:serviceParam wikibase:radius "$radius" .
-            bd:serviceParam wikibase:distance ?dist .
-          }
-          ${if (cleanName.isNotEmpty()) "BIND(IF(CONTAINS(LCASE(?label), \"$cleanName\"), 1, 0) AS ?match)" else "BIND(1 AS ?match)"}
-        } ORDER BY DESC(?match) ?dist LIMIT 25
-    """.trimIndent()
-
-    val url = URL("https://query.wikidata.org/sparql?query=${Uri.encode(query)}&format=json")
-    try {
-        val connection = url.openConnection() as HttpURLConnection
-        // Wikimedia requires an identifiable User-Agent
-        val userAgent = "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)"
-        connection.setRequestProperty("User-Agent", userAgent)
-        connection.setRequestProperty("Accept", "application/json")
-        
-        if (connection.responseCode == 200) {
-            val response = connection.inputStream.bufferedReader().use { it.readText() }
-            val json = JSONObject(response)
-            val bindings = json.getJSONObject("results").getJSONArray("bindings")
-            val photos = mutableListOf<String>()
-            for (i in 0 until bindings.length()) {
-                val photoUrl = bindings.getJSONObject(i).optJSONObject("image")?.optString("value")
-                if (photoUrl != null) {
-                    // Extract filename and use thumb.php for reliable scaling and fewer 403s
-                    val fileName = photoUrl.substringAfter("Special:FilePath/")
-                    val thumbUrl = "https://commons.wikimedia.org/w/thumb.php?f=$fileName&w=800"
-                    photos.add(thumbUrl)
-                }
-            }
-            val result = photos.distinct().take(6)
-            Log.d("Wikidata", "Found ${result.size} relevant photos for $name")
-            return@withContext result
-        }
-    } catch (e: Exception) {
-        Log.e("Wikidata", "Error fetching photos", e)
-    }
-    emptyList()
-}
+// ── Composable ────────────────────────────────────────────────────────────────
 
 @Composable
 fun AddStepScreen(
@@ -176,7 +416,6 @@ fun AddStepScreen(
     val scrollState = rememberScrollState()
     var mapIsInteracting by remember { mutableStateOf(false) }
 
-    // Default position (e.g., Montpellier)
     var selectedLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
     var routeInfo by remember { mutableStateOf<String?>(null) }
 
@@ -188,56 +427,43 @@ fun AddStepScreen(
 
     val categories = listOf(
         "Restauration" to Icons.Default.Restaurant,
-        "Loisirs" to Icons.Default.Hiking,
-        "Découvertes" to Icons.Default.Explore,
-        "Culture" to Icons.Default.AccountBalance
+        "Loisirs"      to Icons.Default.Hiking,
+        "Découvertes"  to Icons.Default.Explore,
+        "Culture"      to Icons.Default.AccountBalance
     )
 
-    // Helper to get photos using free Wikidata + loremflickr fallback
-    fun updatePoiPhotos(latLng: LatLng, name: String) {
-        val displayName = name.ifBlank { searchQuery }
-        Log.d("AddStepScreen", "Updating POI photos for: $displayName at $latLng")
+    // ── Core helper ───────────────────────────────────────────────────────────
+    fun updatePlaceInfo(latLng: LatLng, poiName: String) {
+        val queryName = poiName.ifBlank { searchQuery }
+        Log.d("AddStepScreen", "updatePlaceInfo: '$queryName' at $latLng")
+
         coroutineScope.launch {
-            try {
-                val wikidataPhotos = fetchWikidataPhotos(latLng.latitude, latLng.longitude, displayName)
-                if (wikidataPhotos.isNotEmpty()) {
-                    Log.d("AddStepScreen", "Using ${wikidataPhotos.size} Wikidata photos")
-                    currentPoiPhotos = wikidataPhotos
-                } else {
-                    // Fallback to loremflickr
-                    Log.d("AddStepScreen", "No Wikidata photos found, falling back to loremflickr")
-                    val cleanName = displayName.substringBefore("(").trim()
-                    val searchTerms = if (cleanName.isBlank()) "travel" else cleanName.replace(" ", ",")
-                    val fallbackPhotos = (1..5).map {
-                        "https://loremflickr.com/400/300/$searchTerms?lock=$it"
-                    }
-                    Log.d("AddStepScreen", "Fallback URLs: $fallbackPhotos")
-                    currentPoiPhotos = fallbackPhotos
-                }
-            } catch (e: Exception) {
-                Log.e("AddStepScreen", "Error in updatePoiPhotos", e)
+            val info = fetchPlaceDetails(latLng.latitude, latLng.longitude, queryName)
+            Log.d("AddStepScreen", "infos: '$info'")
+
+            selectedLocation = latLng
+            onLocationSelected(latLng)
+            onStepNameChange(info.name)
+
+            info.inferredCategory?.let { cat ->
+                Log.d("AddStepScreen", "Auto-selecting category: $cat")
+                onStepCategoryChange(cat)
+            }
+
+            currentPoiPhotos = info.photoUrls.ifEmpty {
+                // Fallback: loremflickr keyed on place name
+                val terms = info.name.substringBefore("(").trim()
+                    .replace(" ", ",").ifBlank { "travel" }
+                (1..5).map { "https://loremflickr.com/400/300/$terms?lock=$it" }
+            }
+
+            lastStepLocation?.let { origin ->
+                routeInfo = fetchRouteInfo(origin, latLng)
             }
         }
     }
 
-    // Helper to calculate route from previous location
-    fun updateLocationInfo(newLatLng: LatLng, name: String) {
-        Log.d("AddStepScreen", "updateLocationInfo called for $name at $newLatLng")
-        selectedLocation = newLatLng
-        onLocationSelected(newLatLng)
-        onStepNameChange(name)
-        updatePoiPhotos(newLatLng, name)
-        
-        // Calculate route from previous step if exists
-        lastStepLocation?.let { origin ->
-            Log.d("AddStepScreen", "Requesting route from $origin to $newLatLng")
-            coroutineScope.launch {
-                routeInfo = fetchRouteInfo(origin, newLatLng)
-            }
-        }
-    }
-
-    // Drag and drop state for images
+    // ── Drag & drop state ─────────────────────────────────────────────────────
     var draggedItemUri by remember { mutableStateOf<String?>(null) }
     var initialDragIndex by remember { mutableIntStateOf(-1) }
     var totalDragOffset by remember { mutableFloatStateOf(0f) }
@@ -246,7 +472,6 @@ fun AddStepScreen(
     val density = LocalDensity.current
     val itemWidthPx = remember(density) { with(density) { 88.dp.toPx() } }
 
-    // Use updated state to avoid stale closures in pointerInput
     val currentImagesList by rememberUpdatedState(stepImages)
     val onImagesChangeAction by rememberUpdatedState(onStepImagesChange)
 
@@ -257,6 +482,7 @@ fun AddStepScreen(
         }
     )
 
+    // ── UI ────────────────────────────────────────────────────────────────────
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -297,31 +523,24 @@ fun AddStepScreen(
             }
         }
 
-        // Search for Google Maps points
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            label = { Text("Rechercher un lieu Google Maps") },
+            label = { Text("Rechercher un lieu") },
             placeholder = { Text("Ex: Tour Eiffel, Paris") },
             trailingIcon = {
                 IconButton(onClick = {
-                    Log.d("AddStepScreen", "Search button clicked with query: $searchQuery")
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 geocoder.getFromLocationName(searchQuery, 1) { addresses ->
                                     if (addresses.isNotEmpty()) {
                                         val address = addresses[0]
-                                        Log.d("AddStepScreen", "Address found (Tiramisu+): $address")
                                         val newLatLng = LatLng(address.latitude, address.longitude)
-                                        val name = address.featureName ?: searchQuery
                                         coroutineScope.launch {
-                                            Log.d("AddStepScreen", "Address found (Tiramisu+): $address")
                                             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(newLatLng, 15f))
-                                            updateLocationInfo(newLatLng, name)
+                                            updatePlaceInfo(newLatLng, searchQuery)
                                         }
-                                    } else {
-                                        Log.d("AddStepScreen", "No address found for: $searchQuery")
                                     }
                                 }
                             } else {
@@ -329,16 +548,11 @@ fun AddStepScreen(
                                 val addresses = geocoder.getFromLocationName(searchQuery, 1)
                                 if (addresses?.isNotEmpty() == true) {
                                     val address = addresses[0]
-                                    Log.d("AddStepScreen", "Address found (Legacy): $address")
                                     val newLatLng = LatLng(address.latitude, address.longitude)
-                                    val name = address.featureName ?: searchQuery
                                     withContext(Dispatchers.Main) {
-                                        Log.d("AddStepScreen", "Address found (Legacy): $address")
                                         cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(newLatLng, 15f))
-                                        updateLocationInfo(newLatLng, name)
+                                        updatePlaceInfo(newLatLng, searchQuery)
                                     }
-                                } else {
-                                    Log.d("AddStepScreen", "No address found (Legacy) for: $searchQuery")
                                 }
                             }
                         } catch (e: Exception) {
@@ -353,7 +567,6 @@ fun AddStepScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-        // Route Info Section
         routeInfo?.let { info ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
@@ -370,7 +583,6 @@ fun AddStepScreen(
             }
         }
 
-        // Existing Photos Section
         if (currentPoiPhotos.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -390,17 +602,13 @@ fun AddStepScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable {
-                                    if (isSelected) {
-                                        onStepImagesChange(stepImages - photoUrl)
-                                    } else {
-                                        onStepImagesChange(stepImages + photoUrl)
-                                    }
+                                    if (isSelected) onStepImagesChange(stepImages - photoUrl)
+                                    else onStepImagesChange(stepImages + photoUrl)
                                 }
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(photoUrl)
-                                    .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = null,
@@ -410,9 +618,6 @@ fun AddStepScreen(
                                 contentScale = ContentScale.Crop,
                                 onError = { state ->
                                     Log.e("AddStepScreen", "AsyncImage error for $photoUrl: ${state.result.throwable}")
-                                },
-                                onSuccess = {
-                                    Log.d("AddStepScreen", "AsyncImage success for $photoUrl")
                                 }
                             )
                             if (isSelected) {
@@ -470,9 +675,6 @@ fun AddStepScreen(
                     targetValue = if (isDragging) 1.1f else 1f,
                     label = "dragScale"
                 )
-
-                // When dragging, we use a raw value to avoid the 1-frame lag of animateFloatAsState
-                // which causes the "jump" during swaps.
                 val translationX = if (isDragging) {
                     totalDragOffset - (index - initialDragIndex) * itemWidthPx
                 } else {
@@ -500,13 +702,11 @@ fun AddStepScreen(
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     totalDragOffset += dragAmount.x
-
                                     val list = currentImagesList
                                     val currentIdx = list.indexOf(draggedItemUri)
                                     if (currentIdx != -1) {
                                         val targetIdx = (initialDragIndex + (totalDragOffset / itemWidthPx).roundToInt())
                                             .coerceIn(0, list.size - 1)
-
                                         if (targetIdx != currentIdx) {
                                             val nextIdx = if (targetIdx > currentIdx) currentIdx + 1 else currentIdx - 1
                                             val newList = list.toMutableList()
@@ -534,7 +734,6 @@ fun AddStepScreen(
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageUri)
-                            .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
                             .crossfade(true)
                             .build(),
                         contentDescription = null,
@@ -591,20 +790,16 @@ fun AddStepScreen(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 onMapClick = { latLng ->
-                    selectedLocation = latLng
-                    onLocationSelected(latLng)
-                    updatePoiPhotos(latLng, "")
-                    lastStepLocation?.let { origin ->
-                        coroutineScope.launch {
-                            routeInfo = fetchRouteInfo(origin, latLng)
-                        }
-                    }
+                    updatePlaceInfo(latLng, "")
                 }
             ) {
                 MapEffect(Unit) { map ->
                     map.setOnPoiClickListener { poi ->
                         Log.d("AddStepScreen", "POI clicked: ${poi.name} at ${poi.latLng}")
-                        updateLocationInfo(poi.latLng, poi.name)
+                        updatePlaceInfo(poi.latLng, poi.name)
+                        coroutineScope.launch {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(poi.latLng, 15f))
+                        }
                     }
                 }
                 Marker(
