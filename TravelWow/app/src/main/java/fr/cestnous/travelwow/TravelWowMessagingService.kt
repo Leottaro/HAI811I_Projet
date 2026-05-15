@@ -100,8 +100,9 @@ class TravelWowMessagingService : FirebaseMessagingService() {
         }
 
         fun updateTokenInFirestore(userId: String, token: String) {
+            if (userId.isBlank()) return
             val db = Firebase.firestore
-            db.collection("travelpath").document(userId)
+            db.collection("users").document(userId)
                 .update("fcmToken", token)
                 .addOnSuccessListener { Log.d("FCM", "Token updated in Firestore") }
                 .addOnFailureListener { e -> Log.w("FCM", "Error updating token", e) }

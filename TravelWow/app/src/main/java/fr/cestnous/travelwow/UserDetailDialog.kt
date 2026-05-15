@@ -38,12 +38,16 @@ fun UserDetailDialog(
     var isFollowing by remember { mutableStateOf(false) }
 
     LaunchedEffect(userId, currentUser?.uid) {
+        if (userId.isBlank()) {
+            onDismiss()
+            return@LaunchedEffect
+        }
         try {
             Log.d("UserDetailDialog", "--- Loading User Details ---")
             Log.d("UserDetailDialog", "UserId: $userId")
             Log.d("UserDetailDialog", "Fetching user from Firestore: travelpath/$userId")
             
-            val doc = db.collection("travelpath")
+            val doc = db.collection("users")
                 .document(userId)
                 .get()
                 .await()
@@ -54,7 +58,7 @@ fun UserDetailDialog(
 
             // Check if current user is following this user
             if (currentUser != null && currentUser.uid != userId) {
-                val followDoc = db.collection("travelpath")
+                val followDoc = db.collection("users")
                     .document(currentUser.uid)
                     .collection("following")
                     .document(userId)
@@ -154,12 +158,12 @@ fun UserDetailDialog(
                             onClick = {
                                 coroutineScope.launch {
                                     try {
-                                        val myFollowingRef = db.collection("travelpath")
+                                        val myFollowingRef = db.collection("users")
                                             .document(currentUser.uid)
                                             .collection("following")
                                             .document(userId)
                                         
-                                        val theirFollowersRef = db.collection("travelpath")
+                                        val theirFollowersRef = db.collection("users")
                                             .document(userId)
                                             .collection("followers")
                                             .document(currentUser.uid)
@@ -170,9 +174,9 @@ fun UserDetailDialog(
                                             theirFollowersRef.delete().await()
                                             
                                             // Update counts
-                                            db.collection("travelpath").document(currentUser.uid)
+                                            db.collection("users").document(currentUser.uid)
                                                 .update("followingCount", FieldValue.increment(-1))
-                                            db.collection("travelpath").document(userId)
+                                            db.collection("users").document(userId)
                                                 .update("followersCount", FieldValue.increment(-1))
                                             
                                             isFollowing = false
@@ -183,14 +187,14 @@ fun UserDetailDialog(
                                             theirFollowersRef.set(mapOf("timestamp" to FieldValue.serverTimestamp())).await()
                                             
                                             // Update counts
-                                            db.collection("travelpath").document(currentUser.uid)
+                                            db.collection("users").document(currentUser.uid)
                                                 .update("followingCount", FieldValue.increment(1))
-                                            db.collection("travelpath").document(userId)
+                                            db.collection("users").document(userId)
                                                 .update("followersCount", FieldValue.increment(1))
                                             
                                             // Send Notification if enabled by recipient
                                             if (userDetails?.settings?.newFollowerNotifications == true) {
-                                                val senderDoc = db.collection("travelpath").document(currentUser.uid).get().await()
+                                                val senderDoc = db.collection("users").document(currentUser.uid).get().await()
                                                 val senderProfile = senderDoc.toObject(FirebaseUser::class.java)
                                                 
                                                 val notification = FirebaseNotification(

@@ -8,8 +8,6 @@ import java.util.Date
 data class FavoritePost(
     @PrimaryKey val id: String,
     val authorId: String,
-    val authorName: String,
-    val authorPhotoUrl: String?,
     val title: String,
     val locationName: String,
     val description: String?,
@@ -27,8 +25,6 @@ data class FavoritePost(
         return FirebasePost(
             id = id,
             authorId = authorId,
-            authorName = authorName,
-            authorPhotoUrl = authorPhotoUrl,
             title = title,
             locationName = locationName,
             description = description,
@@ -49,8 +45,6 @@ data class FavoritePost(
             return FavoritePost(
                 id = post.id,
                 authorId = post.authorId,
-                authorName = post.authorName,
-                authorPhotoUrl = post.authorPhotoUrl,
                 title = post.title,
                 locationName = post.locationName,
                 description = post.description,

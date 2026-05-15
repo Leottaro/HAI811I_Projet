@@ -81,6 +81,19 @@ fun DetailsSheetContent(
     var newCommentText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
 
+    var author by remember { mutableStateOf<FirebaseUser?>(null) }
+    LaunchedEffect(post?.authorId) {
+        val authorId = post?.authorId
+        if (!authorId.isNullOrBlank()) {
+            try {
+                val snapshot = db.collection("users").document(authorId).get().await()
+                author = snapshot.toObject(FirebaseUser::class.java)
+            } catch (e: Exception) {
+                Log.e("DetailsBottomSheet", "Error fetching author", e)
+            }
+        }
+    }
+
     LaunchedEffect(post?.id, currentUser?.uid) {
         if (post != null && currentUser != null) {
             try {
@@ -89,7 +102,7 @@ fun DetailsSheetContent(
                 isFavorite = dbLocal.favoritePostDao().isFavorite(post.id)
 
                 // Sync with Firestore
-                val doc = db.collection("travelpath").document(currentUser.uid)
+                val doc = db.collection("users").document(currentUser.uid)
                     .collection("favorites").document(post.id).get().await()
                 val existsInFirestore = doc.exists()
                 
@@ -380,10 +393,6 @@ fun DetailsSheetContent(
                                         isSending = true
                                         val commentData = hashMapOf(
                                             "authorId" to currentUser.uid,
-                                            "authorName" to (currentUserProfile?.username
-                                                ?: currentUser.displayName ?: "Voyageur"),
-                                            "authorPhotoUrl" to (currentUserProfile?.photoUrl
-                                                ?: currentUser.photoUrl?.toString()),
                                             "text" to newCommentText,
                                             "likesCount" to 0,
                                             "createdAt" to FieldValue.serverTimestamp()
@@ -400,10 +409,10 @@ fun DetailsSheetContent(
                                                     .update("commentsCount", FieldValue.increment(1))
                                                 
                                                 // Send Notification to Post Author (if not self)
-                                                if (post.authorId != currentUser.uid) {
+                                                if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
                                                     coroutineScope.launch {
                                                         try {
-                                                            val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
+                                                            val authorDoc = db.collection("users").document(post.authorId).get().await()
                                                             val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                             
                                                             if (authorProfile?.settings?.commentsNotifications == true) {
@@ -481,9 +490,9 @@ fun DetailsSheetContent(
                                         }
                                         .padding(bottom = 12.dp)
                                 ) {
-                                    if (post.authorPhotoUrl != null) {
+                                    if (author?.photoUrl != null) {
                                         AsyncImage(
-                                            model = post.authorPhotoUrl,
+                                            model = author?.photoUrl,
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(32.dp)
@@ -491,7 +500,7 @@ fun DetailsSheetContent(
                                                 .background(MaterialTheme.colorScheme.secondaryContainer),
                                             contentScale = ContentScale.Crop
                                         )
-                                    } else {
+                                    } else if (author != null) {
                                         Box(
                                             modifier = Modifier
                                                 .size(32.dp)
@@ -500,7 +509,7 @@ fun DetailsSheetContent(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                post.authorName.take(1).uppercase(),
+                                                author!!.username.take(1).uppercase(),
                                                 style = MaterialTheme.typography.labelMedium,
                                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                                             )
@@ -509,7 +518,7 @@ fun DetailsSheetContent(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = post.authorName,
+                                            text = author?.username ?: "Username",
                                             style = MaterialTheme.typography.titleSmall,
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -681,40 +690,68 @@ fun DetailsSheetContent(
                         }
 
                         items(previewComments, key = { it.id }) { comment ->
-                            CommentItem(
-                                comment = comment,
-                                currentUserId = currentUser?.uid,
-                                onLikeClick = {
-                                    if (currentUser != null) {
-                                        val commentRef = db.collection("travelpath_posts")
-                                            .document(post.id)
-                                            .collection("comments")
-                                            .document(comment.id)
-                                        
-                                        coroutineScope.launch {
-                                            try {
-                                                if (comment.likedByUsers.contains(currentUser.uid)) {
-                                                    commentRef.update("likedByUsers", FieldValue.arrayRemove(currentUser.uid)).await()
-                                                } else {
-                                                    commentRef.update("likedByUsers", FieldValue.arrayUnion(currentUser.uid)).await()
+                            var commentAuthor by remember { mutableStateOf<FirebaseUser?>(null) }
+                            LaunchedEffect(comment.authorId) {
+                                if (comment.authorId.isNotBlank()) {
+                                    try {
+                                        val snapshot = db.collection("users").document(comment.authorId).get().await()
+                                        commentAuthor = snapshot.toObject(FirebaseUser::class.java)
+                                    } catch (e: Exception) {
+                                        Log.e("DetailsBottomSheet", "Error fetching comment author", e)
+                                    }
+                                }
+                            }
+
+                            if (commentAuthor != null) {
+                                CommentItem(
+                                    comment = comment,
+                                    author = commentAuthor!!,
+                                    currentUserId = currentUser?.uid,
+                                    onLikeClick = {
+                                        if (currentUser != null) {
+                                            val commentRef = db.collection("travelpath_posts")
+                                                .document(post.id)
+                                                .collection("comments")
+                                                .document(comment.id)
+
+                                            coroutineScope.launch {
+                                                try {
+                                                    if (comment.likedByUsers.contains(currentUser.uid)) {
+                                                        commentRef.update(
+                                                            "likedByUsers",
+                                                            FieldValue.arrayRemove(currentUser.uid)
+                                                        ).await()
+                                                    } else {
+                                                        commentRef.update(
+                                                            "likedByUsers",
+                                                            FieldValue.arrayUnion(currentUser.uid)
+                                                        ).await()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e(
+                                                        "DetailsBottomSheet",
+                                                        "Error liking comment",
+                                                        e
+                                                    )
                                                 }
-                                            } catch (e: Exception) {
-                                                Log.e("DetailsBottomSheet", "Error liking comment", e)
                                             }
                                         }
+                                    },
+                                    onAuthorClick = {
+                                        Log.d(
+                                            "DetailsBottomSheet",
+                                            "Author clicked: ${commentAuthor!!.username} (ID: ${comment.authorId})"
+                                        )
+                                        selectedUserId = comment.authorId
+                                        showUserDialog = true
+                                    },
+                                    onReportClick = {
+                                        reportTargetId = comment.id
+                                        reportTargetType = "comment"
+                                        showReportDialog = true
                                     }
-                                },
-                                onAuthorClick = {
-                                    Log.d("DetailsBottomSheet", "Author clicked: ${comment.authorName} (ID: ${comment.authorId})")
-                                    selectedUserId = comment.authorId
-                                    showUserDialog = true
-                                },
-                                onReportClick = {
-                                    reportTargetId = comment.id
-                                    reportTargetType = "comment"
-                                    showReportDialog = true
-                                }
-                            )
+                                )
+                            }
                         }
                     }
 
@@ -724,7 +761,10 @@ fun DetailsSheetContent(
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(16.dp)
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                CircleShape
+                            )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -744,23 +784,21 @@ fun DetailsSheetContent(
                     ) {
                         IconButton(
                             onClick = {
-                                if (post != null) {
-                                    isExporting = true
-                                    coroutineScope.launch {
-                                        val file = PdfExporter.exportPostToPdf(context, post, steps)
-                                        isExporting = false
-                                        if (file != null) {
-                                            val uri = androidx.core.content.FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.provider",
-                                                file
-                                            )
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "application/pdf")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(Intent.createChooser(intent, "Ouvrir le PDF"))
+                                isExporting = true
+                                coroutineScope.launch {
+                                    val file = PdfExporter.exportPostToPdf(context, post, author!!, steps)
+                                    isExporting = false
+                                    if (file != null) {
+                                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.provider",
+                                            file
+                                        )
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, "application/pdf")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
+                                        context.startActivity(Intent.createChooser(intent, "Ouvrir le PDF"))
                                     }
                                 }
                             },
@@ -791,12 +829,11 @@ fun DetailsSheetContent(
                                 )
                             }
                         }
-
-                        if (!isAuthor) {
+                        else {
                             IconButton(
                                 onClick = {
-                                    if (post != null && currentUser != null) {
-                                        val favoriteRef = db.collection("travelpath").document(currentUser.uid)
+                                    if (currentUser != null) {
+                                        val favoriteRef = db.collection("users").document(currentUser.uid)
                                             .collection("favorites").document(post.id)
                                         val dbLocal = TravelWowDatabase.getDatabase(context)
                                         
@@ -814,9 +851,9 @@ fun DetailsSheetContent(
                                                     isFavorite = true
 
                                                     // Send Notification to Post Author (if not self)
-                                                    if (post.authorId != currentUser.uid) {
+                                                    if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
                                                         try {
-                                                            val authorDoc = db.collection("travelpath").document(post.authorId).get().await()
+                                                            val authorDoc = db.collection("users").document(post.authorId).get().await()
                                                             val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                             
                                                             if (authorProfile?.settings?.likesNotifications == true) {
@@ -955,6 +992,7 @@ fun StepItemView(step: FirebaseStep) {
 @Composable
 fun CommentItem(
     comment: FirebaseComment,
+    author: FirebaseUser,
     currentUserId: String? = null,
     onLikeClick: () -> Unit = {},
     onAuthorClick: () -> Unit = {},
@@ -969,10 +1007,9 @@ fun CommentItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        if (comment.authorPhotoUrl != null) {
-            Log.d("comment.authorPhotoUrl", comment.authorPhotoUrl);
+        if (author.photoUrl != null) {
             AsyncImage(
-                model = comment.authorPhotoUrl,
+                model = author.photoUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(40.dp)
@@ -991,7 +1028,7 @@ fun CommentItem(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    comment.authorName.take(1).uppercase(),
+                    author.username.take(1).uppercase(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -1005,14 +1042,14 @@ fun CommentItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = comment.authorName,
+                    text = author.username,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onAuthorClick() }
                 )
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val date = comment.createdAt?.toDate() ?: java.util.Date()
+                    val date = comment.createdAt.toDate()
                     val sdf = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
                     Text(
                         text = sdf.format(date),

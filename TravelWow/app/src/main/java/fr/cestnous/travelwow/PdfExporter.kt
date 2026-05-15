@@ -25,7 +25,7 @@ object PdfExporter {
     private const val PAGE_HEIGHT = 842 // A4 height in points
     private const val MARGIN = 40f
 
-    suspend fun exportPostToPdf(context: Context, post: FirebasePost, steps: List<FirebaseStep>): File? {
+    suspend fun exportPostToPdf(context: Context, post: FirebasePost, author: FirebaseUser, steps: List<FirebaseStep>): File? {
         val pdfDocument = PdfDocument()
         val paint = Paint()
         val titlePaint = Paint().apply {
@@ -57,7 +57,7 @@ object PdfExporter {
         canvas.drawText(post.title, MARGIN, currentY + 24f, titlePaint)
         currentY += 40f
 
-        canvas.drawText("Par ${post.authorName} • ${post.locationName}", MARGIN, currentY, metaPaint)
+        canvas.drawText("Par ${author.username} • ${post.locationName}", MARGIN, currentY, metaPaint)
         currentY += 20f
         
         canvas.drawText("${"%.1f".format(post.distanceKm)} km", MARGIN, currentY, metaPaint)

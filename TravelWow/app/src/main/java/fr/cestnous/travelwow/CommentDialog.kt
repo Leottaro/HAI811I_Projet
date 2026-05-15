@@ -139,7 +139,20 @@ fun CommentDialog(
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         items(comments) { comment ->
-                            FirebaseCommentItem(comment)
+                            var author by remember { mutableStateOf<FirebaseUser?>(null) }
+
+                            LaunchedEffect(comment.authorId) {
+                                if (comment.authorId.isNotBlank()) {
+                                    try {
+                                        val snapshot = db.collection("users").document(comment.authorId).get().await()
+                                        author = snapshot.toObject(FirebaseUser::class.java)
+                                    } catch (e: Exception) {
+                                        Log.e("CommentDialog", "Error fetching comment author", e)
+                                    }
+                                }
+                            }
+
+                            author?.let { FirebaseCommentItem(comment, it) }
                         }
                     }
                 }
@@ -171,8 +184,6 @@ fun CommentDialog(
                                 isSending = true
                                 val commentData = hashMapOf(
                                     "authorId" to currentUser.uid,
-                                    "authorName" to (currentUserProfile?.username ?: currentUser.displayName ?: "Voyageur"),
-                                    "authorPhotoUrl" to (currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString()),
                                     "text" to newCommentText,
                                     "likesCount" to 0,
                                     "createdAt" to FieldValue.serverTimestamp()
@@ -189,10 +200,10 @@ fun CommentDialog(
                                             .update("commentsCount", FieldValue.increment(1))
 
                                         // Send Notification to Post Author (if not self)
-                                        if (postAuthorId != currentUser.uid) {
+                                        if (postAuthorId.isNotBlank() && postAuthorId != currentUser.uid) {
                                             coroutineScope.launch {
                                                 try {
-                                                    val authorDoc = db.collection("travelpath").document(postAuthorId).get().await()
+                                                    val authorDoc = db.collection("users").document(postAuthorId).get().await()
                                                     val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                     
                                                     if (authorProfile?.settings?.commentsNotifications == true) {
@@ -253,14 +264,14 @@ fun CommentDialog(
 }
 
 @Composable
-fun FirebaseCommentItem(comment: FirebaseComment) {
+fun FirebaseCommentItem(comment: FirebaseComment, author: FirebaseUser) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
-        if (comment.authorPhotoUrl != null) {
+        if (author.photoUrl != null) {
             AsyncImage(
-                model = comment.authorPhotoUrl,
+                model = author.photoUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(36.dp)
@@ -277,7 +288,7 @@ fun FirebaseCommentItem(comment: FirebaseComment) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = comment.authorName.take(1).uppercase(),
+                    text = author.username.take(1).uppercase(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -292,7 +303,7 @@ fun FirebaseCommentItem(comment: FirebaseComment) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = comment.authorName,
+                    text = author.username,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

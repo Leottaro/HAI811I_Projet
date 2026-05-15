@@ -124,7 +124,7 @@ fun TravelWowApp(
             })
 
             // Load Profile
-            val doc = db.collection("travelpath").document(user.uid).get().await()
+            val doc = db.collection("users").document(user.uid).get().await()
             if (doc.exists()) {
                 userProfile = doc.toObject(FirebaseUser::class.java)
             } else if (user.email != null) {
@@ -136,7 +136,7 @@ fun TravelWowApp(
                     username = initialUsername,
                     email = user.email!!,
                 )
-                db.collection("travelpath").document(user.uid).set(initialProfile).await()
+                db.collection("users").document(user.uid).set(initialProfile).await()
                 userProfile = initialProfile
             }
 
@@ -374,8 +374,6 @@ fun TravelWowApp(
                                         val post = FirebasePost(
                                             id = postId,
                                             authorId = user.uid,
-                                            authorName = userProfile?.username ?: "Utilisateur inconnu",
-                                            authorPhotoUrl = userProfile?.photoUrl,
                                             title = postTitle,
                                             locationName = firebaseSteps.firstOrNull()!!.name,
                                             description = postDescription,
@@ -400,7 +398,7 @@ fun TravelWowApp(
                                         // Notify all followers
                                         coroutineScope.launch {
                                             try {
-                                                val followersSnapshot = db.collection("travelpath")
+                                                val followersSnapshot = db.collection("users")
                                                     .document(user.uid)
                                                     .collection("followers")
                                                     .get()
@@ -412,7 +410,7 @@ fun TravelWowApp(
                                                 if (followerIds.isNotEmpty()) {
                                                     // Process in chunks of 10 to check settings
                                                     followerIds.chunked(10).forEach { chunk ->
-                                                        val profiles = db.collection("travelpath")
+                                                        val profiles = db.collection("users")
                                                             .whereIn(FieldPath.documentId(), chunk)
                                                             .get()
                                                             .await()
@@ -521,7 +519,7 @@ fun TravelWowApp(
                                 )
                                 finalPhotoUrl?.let { updates["photoUrl"] = it }
                                 
-                                db.collection("travelpath").document(user.uid)
+                                db.collection("users").document(user.uid)
                                     .set(updates, com.google.firebase.firestore.SetOptions.merge())
                                     .await()
                                 
@@ -556,7 +554,7 @@ fun TravelWowApp(
                     onSave = { newSettings ->
                         coroutineScope.launch {
                             try {
-                                db.collection("travelpath").document(user.uid)
+                                db.collection("users").document(user.uid)
                                     .update("settings", newSettings)
                                     .await()
                                 userProfile = userProfile?.copy(settings = newSettings)
@@ -601,7 +599,7 @@ fun TravelWowApp(
                                                 isSavingDraft = true
                                                 coroutineScope.launch {
                                                     try {
-                                                        val draftRef = db.collection("travelpath").document(user.uid)
+                                                        val draftRef = db.collection("users").document(user.uid)
                                                             .collection("drafts").document()
                                                         
                                                         val draft = hashMapOf(

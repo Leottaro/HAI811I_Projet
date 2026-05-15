@@ -75,7 +75,7 @@ fun PostsGallery(
                     }
 
                     // Then fetch from Firestore to sync
-                    val snapshot = db.collection("travelpath").document(favoritesUserId).collection("favorites").get().await()
+                    val snapshot = db.collection("users").document(favoritesUserId).collection("favorites").get().await()
                     val firestorePosts = snapshot.toObjects(FirebasePost::class.java)
                     
                     // Update cache and state

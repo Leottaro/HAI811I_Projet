@@ -37,8 +37,12 @@ fun DraftsGallery(
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(userId) {
+        if (userId.isBlank()) {
+            isLoading = false
+            return@LaunchedEffect
+        }
         try {
-            val snapshot = db.collection("travelpath").document(userId)
+            val snapshot = db.collection("users").document(userId)
                 .collection("drafts")
                 .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .get()

@@ -50,7 +50,7 @@ fun SharePostDialog(
         if (currentUser != null) {
             try {
                 // Fetch following IDs
-                val followingIds = db.collection("travelpath")
+                val followingIds = db.collection("users")
                     .document(currentUser.uid)
                     .collection("following")
                     .get()
@@ -58,7 +58,7 @@ fun SharePostDialog(
                     .documents.map { it.id }
 
                 // Fetch follower IDs
-                val followerIds = db.collection("travelpath")
+                val followerIds = db.collection("users")
                     .document(currentUser.uid)
                     .collection("followers")
                     .get()
@@ -71,7 +71,7 @@ fun SharePostDialog(
                     // Fetch profile details for these IDs in chunks
                     val profiles = mutableListOf<FirebaseUser>()
                     allUserIds.chunked(10).forEach { chunk ->
-                        val snapshot = db.collection("travelpath")
+                        val snapshot = db.collection("users")
                             .whereIn(FieldPath.documentId(), chunk)
                             .get()
                             .await()
