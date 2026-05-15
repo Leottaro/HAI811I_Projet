@@ -173,7 +173,10 @@ fun TravelWowApp(
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutDialog = false
-                    onLogout()
+                    coroutineScope.launch {
+                        TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
+                        onLogout()
+                    }
                 }) {
                     Text("Se déconnecter", color = MaterialTheme.colorScheme.error)
                 }
@@ -505,7 +508,10 @@ fun TravelWowApp(
                     onBack = { showSettings = false },
                     onLogout = { 
                         showSettings = false
-                        onLogout() 
+                        coroutineScope.launch {
+                            TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
+                            onLogout()
+                        }
                     },
                     onSave = { newSettings ->
                         coroutineScope.launch {

@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -51,6 +52,7 @@ fun PostsGallery(
     onEmptySpaceClick: () -> Unit = {}
 ) {
     val db = remember { Firebase.firestore }
+    val context = LocalContext.current
     var posts by remember { mutableStateOf<List<FirebasePost>>(emptyList()) }
     var isRefreshing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -61,24 +63,56 @@ fun PostsGallery(
             try {
                 Log.d("PostsGallery", "Fetching posts...")
                 
-                val query: Query = if (favoritesUserId != null) {
+                if (favoritesUserId != null) {
                     Log.d("PostsGallery", "Fetching favorites for: $favoritesUserId")
-                    db.collection("travelpath").document(favoritesUserId).collection("favorites")
-                } else if (userIdFilter != null) {
-                    Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
-                    db.collection("travelpath_posts").whereEqualTo("authorId", userIdFilter)
-                } else {
-                    db.collection("travelpath_posts")
-                }
+                    
+                    // Load from local cache first
+                    val dbLocal = TravelWowDatabase.getDatabase(context)
+                    val cachedFavorites = dbLocal.favoritePostDao().getAllFavorites()
+                    if (cachedFavorites.isNotEmpty()) {
+                        posts = cachedFavorites.map { it.toFirebasePost() }
+                    }
 
-                val snapshot = query.limit(50).get().await()
-                Log.d("PostsGallery", "Snapshot received with ${snapshot.size()} documents")
-                var fetchedPosts = snapshot.toObjects(FirebasePost::class.java)
-                
-                // Sort in memory to avoid index requirements for now
-                fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
-                
-                posts = fetchedPosts
+                    // Then fetch from Firestore to sync
+                    val snapshot = db.collection("travelpath").document(favoritesUserId).collection("favorites").get().await()
+                    val firestorePosts = snapshot.toObjects(FirebasePost::class.java)
+                    
+                    // Update cache and state
+                    posts = firestorePosts.sortedByDescending { it.createdAt }
+                    
+                    coroutineScope.launch {
+                        // Sync cache with Firestore data
+                        val firestoreIds = firestorePosts.map { it.id }.toSet()
+                        
+                        // Add/Update from Firestore
+                        firestorePosts.forEach { post ->
+                            dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
+                        }
+                        
+                        // Remove what's no longer in Firestore
+                        cachedFavorites.forEach { cached ->
+                            if (!firestoreIds.contains(cached.id)) {
+                                dbLocal.favoritePostDao().deleteByPostId(cached.id)
+                            }
+                        }
+                    }
+                } else {
+                    val query: Query = if (userIdFilter != null) {
+                        Log.d("PostsGallery", "Filtering by userId: $userIdFilter")
+                        db.collection("travelpath_posts").whereEqualTo("authorId", userIdFilter)
+                    } else {
+                        db.collection("travelpath_posts")
+                    }
+
+                    val snapshot = query.limit(50).get().await()
+                    Log.d("PostsGallery", "Snapshot received with ${snapshot.size()} documents")
+                    var fetchedPosts = snapshot.toObjects(FirebasePost::class.java)
+                    
+                    // Sort in memory to avoid index requirements for now
+                    fetchedPosts = fetchedPosts.sortedByDescending { it.createdAt }
+                    
+                    posts = fetchedPosts
+                }
             } catch (e: Exception) {
                 Log.e("PostsGallery", "Error fetching posts", e)
                 e.printStackTrace()

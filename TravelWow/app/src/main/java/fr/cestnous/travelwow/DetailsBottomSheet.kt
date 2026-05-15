@@ -81,9 +81,23 @@ fun DetailsSheetContent(
     LaunchedEffect(post?.id, currentUser?.uid) {
         if (post != null && currentUser != null) {
             try {
+                // Check local cache first
+                val dbLocal = TravelWowDatabase.getDatabase(context)
+                isFavorite = dbLocal.favoritePostDao().isFavorite(post.id)
+
+                // Sync with Firestore
                 val doc = db.collection("travelpath").document(currentUser.uid)
                     .collection("favorites").document(post.id).get().await()
-                isFavorite = doc.exists()
+                val existsInFirestore = doc.exists()
+                
+                if (existsInFirestore != isFavorite) {
+                    isFavorite = existsInFirestore
+                    if (isFavorite) {
+                        dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
+                    } else {
+                        dbLocal.favoritePostDao().deleteByPostId(post.id)
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("DetailsBottomSheet", "Error checking favorites", e)
             }
@@ -696,16 +710,19 @@ fun DetailsSheetContent(
                                 if (post != null && currentUser != null) {
                                     val favoriteRef = db.collection("travelpath").document(currentUser.uid)
                                         .collection("favorites").document(post.id)
+                                    val dbLocal = TravelWowDatabase.getDatabase(context)
                                     
                                     coroutineScope.launch {
                                         try {
                                             if (isFavorite) {
                                                 favoriteRef.delete().await()
+                                                dbLocal.favoritePostDao().deleteByPostId(post.id)
                                                 isFavorite = false
                                             } else {
                                                 // We can store a summary of the post or just the reference
                                                 // Storing the whole post object for easier display in Favorites screen
                                                 favoriteRef.set(post).await()
+                                                dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post))
                                                 isFavorite = true
 
                                                 // Send Notification to Post Author (if not self)
