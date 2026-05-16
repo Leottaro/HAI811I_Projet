@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +42,8 @@ fun SearchTopBar(
     isPostSelected: Boolean = false,
     onDeselect: () -> Unit = {},
     onFilterClick: () -> Unit = {},
-    isFilterActive: Boolean = false
+    isFilterActive: Boolean = false,
+    onSwitchClick: (() -> Unit)? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -55,6 +57,17 @@ fun SearchTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Switch back button (if not in sub-states)
+                if (onSwitchClick != null && !isAdding && !isAddingStep && !isPostSelected) {
+                    IconButton(onClick = onSwitchClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Retour",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
                 // "+" / "Cancel" / "Back" / "Return" Button
                 IconButton(
                     onClick = {
