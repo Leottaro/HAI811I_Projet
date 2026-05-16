@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
+import fr.cestnous.travelwow.travelPath.ui.auth.AuthScreen
 import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 class MainActivity : ComponentActivity() {

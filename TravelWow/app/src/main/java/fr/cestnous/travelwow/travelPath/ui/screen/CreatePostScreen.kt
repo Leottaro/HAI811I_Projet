@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui.screen
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring

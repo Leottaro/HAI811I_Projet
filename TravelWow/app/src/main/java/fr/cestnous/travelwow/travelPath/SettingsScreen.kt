@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseUserSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

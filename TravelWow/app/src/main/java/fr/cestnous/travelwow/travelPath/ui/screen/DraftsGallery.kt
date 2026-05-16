@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui.screen
 
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -24,6 +24,9 @@ import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.local.DraftDao
+import fr.cestnous.travelwow.travelPath.data.local.LocalDraft
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
 import kotlinx.coroutines.tasks.await
 
 data class FirebaseDraft(

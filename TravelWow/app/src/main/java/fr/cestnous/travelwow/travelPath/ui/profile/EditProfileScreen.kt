@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui.profile
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.UserDetailDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

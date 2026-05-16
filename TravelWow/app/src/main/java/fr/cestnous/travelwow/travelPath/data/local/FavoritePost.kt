@@ -1,8 +1,9 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.data.local
 
 import android.content.Context
 import androidx.room.*
 import com.google.firebase.Timestamp
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
 import java.util.Date
 
 @Entity(tableName = "favorite_posts")

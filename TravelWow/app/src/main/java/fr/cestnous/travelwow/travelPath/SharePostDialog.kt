@@ -27,6 +27,10 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.firestore
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseNotification
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseUser
+import fr.cestnous.travelwow.travelPath.data.model.NotificationType
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -164,7 +168,8 @@ fun SharePostDialog(
                                                 recipientId = user.id,
                                                 senderId = currentUser?.uid ?: "",
                                                 senderName = senderName,
-                                                senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser?.photoUrl?.toString(),
+                                                senderPhotoUrl = currentUserProfile?.photoUrl
+                                                    ?: currentUser?.photoUrl?.toString(),
                                                 type = NotificationType.SHARE_POST,
                                                 targetId = post.id,
                                                 title = "Nouveau parcours partagé !",
