@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,7 +46,8 @@ fun SearchTopBar(
     onDeselect: () -> Unit = {},
     onFilterClick: () -> Unit = {},
     isFilterActive: Boolean = false,
-    onSwitchClick: (() -> Unit)? = null
+    onSwitchClick: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -149,6 +151,16 @@ fun SearchTopBar(
                             .weight(1f)
                             .height(52.dp)
                     )
+
+                    if (onLogout != null) {
+                        IconButton(onClick = onLogout) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Déconnexion",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 } else {
                     // Title
                     Text(
@@ -314,6 +326,7 @@ fun SearchScreen(
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
     excludeUserId: String? = null,
+    favoritesUserId: String? = null,
     searchQuery: String = "",
     filter: PostFilter = PostFilter(),
     onFilterChange: (PostFilter) -> Unit = {},
@@ -332,6 +345,7 @@ fun SearchScreen(
             viewMode = viewMode,
             modifier = Modifier.weight(1f),
             excludeUserId = excludeUserId,
+            favoritesUserId = favoritesUserId,
             searchQuery = searchQuery,
             filter = filter,
             focusedPost = focusedPost,

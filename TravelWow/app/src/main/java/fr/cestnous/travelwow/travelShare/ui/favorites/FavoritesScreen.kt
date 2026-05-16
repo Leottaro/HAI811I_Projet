@@ -25,12 +25,6 @@ fun FavoritesScreen(
     val currentUser = FirebaseAuth.getInstance().currentUser
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "Mes Favoris",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(16.dp)
-        )
-
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()

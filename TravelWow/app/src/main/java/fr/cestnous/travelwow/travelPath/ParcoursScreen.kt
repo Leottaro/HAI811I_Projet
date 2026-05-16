@@ -33,7 +33,8 @@ fun ParcoursScreen(
     user: AuthUser,
     onLogout: () -> Unit,
     onBackToShare: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showFavoritesOnly: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -100,7 +101,8 @@ fun ParcoursScreen(
                 onViewModeChange = { galleryViewMode = it },
                 isPostSelected = showBottomSheet,
                 onDeselect = { showBottomSheet = false },
-                onSwitchClick = onBackToShare
+                onSwitchClick = onBackToShare,
+                onLogout = onLogout
             )
         }
     ) { padding ->
@@ -136,7 +138,8 @@ fun ParcoursScreen(
                     onPostClick = { selectedPost = it; showBottomSheet = true },
                     viewMode = galleryViewMode,
                     searchQuery = searchQuery,
-                    excludeUserId = user.uid,
+                    excludeUserId = if (showFavoritesOnly) null else user.uid,
+                    favoritesUserId = if (showFavoritesOnly) user.uid else null,
                     filter = postFilter,
                     onFilterChange = { postFilter = it }
                 )

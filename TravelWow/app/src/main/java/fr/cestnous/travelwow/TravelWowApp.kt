@@ -79,7 +79,6 @@ fun TravelWowApp(
         }
     }
 
-    // Gestion du bouton retour : si on est en mode PATH, on revient d'abord en SHARE
     BackHandler(enabled = subScreen !is SubScreen.None || appMode == AppMode.PATH) {
         if (subScreen !is SubScreen.None) {
             subScreen = SubScreen.None
@@ -94,9 +93,8 @@ fun TravelWowApp(
                 item(
                     icon = dest.icon,
                     label = { Text(dest.label) },
-                    selected = appMode == AppMode.SHARE && currentDestination == dest,
+                    selected = currentDestination == dest,
                     onClick = { 
-                        appMode = AppMode.SHARE
                         currentDestination = dest
                         subScreen = SubScreen.None 
                     }
@@ -138,11 +136,13 @@ fun TravelWowApp(
                 )
                 SubScreen.Settings -> ShareSettings(onBack = { subScreen = SubScreen.None })
                 SubScreen.None -> {
-                    if (appMode == AppMode.PATH) {
+                    val isPathEligible = currentDestination == MainDestination.Feed || currentDestination == MainDestination.Favorites
+                    if (appMode == AppMode.PATH && isPathEligible) {
                         ParcoursScreen(
                             user = user,
                             onLogout = onLogout,
-                            onBackToShare = { appMode = AppMode.SHARE }
+                            onBackToShare = { appMode = AppMode.SHARE },
+                            showFavoritesOnly = currentDestination == MainDestination.Favorites
                         )
                     } else {
                         when (currentDestination) {
@@ -156,10 +156,8 @@ fun TravelWowApp(
                                             }
                                         },
                                         actions = {
-                                            if (currentDestination == MainDestination.Feed) {
-                                                IconButton(onClick = { subScreen = SubScreen.PhotoMap }) {
-                                                    Icon(Icons.Default.Map, "Carte")
-                                                }
+                                            IconButton(onClick = { subScreen = SubScreen.PhotoMap }) {
+                                                Icon(Icons.Default.Map, "Carte")
                                             }
                                             IconButton(onClick = onLogout) {
                                                 Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion")
@@ -168,7 +166,7 @@ fun TravelWowApp(
                                     )
                                 },
                                 floatingActionButton = {
-                                    if (currentDestination == MainDestination.Feed && !isAnonymous) {
+                                    if (!isAnonymous) {
                                         FloatingActionButton(onClick = { subScreen = SubScreen.PhotoUpload }) {
                                             Icon(Icons.Default.Add, "Publier")
                                         }
@@ -179,7 +177,27 @@ fun TravelWowApp(
                                     FeedScreen(onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) })
                                 }
                             }
-                            MainDestination.Favorites -> ShareFavorites(onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) })
+                            MainDestination.Favorites -> Scaffold(
+                                topBar = {
+                                    CenterAlignedTopAppBar(
+                                        title = { Text("Mes Favoris") },
+                                        navigationIcon = {
+                                            IconButton(onClick = { appMode = AppMode.PATH }) {
+                                                Icon(Icons.Default.Route, contentDescription = "Mode Parcours")
+                                            }
+                                        },
+                                        actions = {
+                                            IconButton(onClick = onLogout) {
+                                                Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion")
+                                            }
+                                        }
+                                    )
+                                }
+                            ) { p ->
+                                Box(modifier = Modifier.padding(p)) {
+                                    ShareFavorites(onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) })
+                                }
+                            }
                             MainDestination.Messages -> ChatListScreen(
                                 onChatClick = { subScreen = SubScreen.Chat(it) },
                                 onGroupChatClick = { subScreen = SubScreen.GroupChat(it) }
