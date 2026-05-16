@@ -25,8 +25,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        // On passe le Cloud Name au code via BuildConfig
         buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"${localProperties.getProperty("cloudinary.cloud_name") ?: ""}\"")
+        buildConfigField("String", "FCM_SERVER_KEY", "\"${localProperties.getProperty("fcm.server_key") ?: ""}\"")
     }
 
     buildTypes {
@@ -63,6 +63,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.cloudinary.android)
     
+    // OpenStreetMap
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -75,4 +78,5 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }
