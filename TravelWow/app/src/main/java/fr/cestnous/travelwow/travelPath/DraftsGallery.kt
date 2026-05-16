@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -14,15 +14,16 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import fr.cestnous.travelwow.R
 import kotlinx.coroutines.tasks.await
 
 data class FirebaseDraft(
@@ -130,7 +131,7 @@ fun DraftsGallery(
             // Pull from Firestore
             val snapshot = db.collection("users").document(userId)
                 .collection("drafts")
-                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
             

@@ -1,8 +1,8 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.PropertyName
+import com.google.firebase.firestore.Exclude
 
 /**
  * Model representing a User in Firestore.
@@ -57,7 +57,7 @@ data class FirebasePost(
     val durationMinutes: Int = 0,
     val likesCount: Int = 0,
     val commentsCount: Int = 0,
-    @get:com.google.firebase.firestore.Exclude val steps: List<FirebaseStep> = emptyList(),
+    @get:Exclude val steps: List<FirebaseStep> = emptyList(),
     val createdAt: Timestamp = Timestamp.now(),
     val categories: List<String> = emptyList()
 )

@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.app.Application
 import android.util.Log
@@ -6,8 +6,8 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.Firebase
 import com.google.firebase.appcheck.appCheck
-import com.google.firebase.storage.storage
 import com.cloudinary.android.MediaManager
+import fr.cestnous.travelwow.BuildConfig
 
 class TravelWowApplication : Application() {
     override fun onCreate() {
@@ -16,7 +16,7 @@ class TravelWowApplication : Application() {
 
         // Initialisation de Cloudinary
         MediaManager.init(this, mapOf(
-            "cloud_name" to BuildConfig.CLOUDINARY_CLOUD_NAME,
+            "cloud_name" to BuildConfig.cloudinarycloud_name,
             "secure" to true
         ))
 

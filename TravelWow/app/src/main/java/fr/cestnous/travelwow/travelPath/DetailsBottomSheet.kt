@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.content.Intent
 import android.util.Log
@@ -29,14 +29,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import fr.cestnous.travelwow.R
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +73,7 @@ fun DetailsSheetContent(
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
             // Small delay to let the initial layout pass complete
-            kotlinx.coroutines.delay(50)
+            delay(50)
             if (sheetState.currentValue == SheetValue.PartiallyExpanded) {
                 sheetState.expand()
             }
@@ -156,7 +162,7 @@ fun DetailsSheetContent(
                 // Fetch a preview of comments (last 3)
                 db.collection("travelpath_posts").document(post.id)
                     .collection("comments")
-                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .orderBy("createdAt", Query.Direction.DESCENDING)
                     .limit(3)
                     .addSnapshotListener { snapshot, e ->
                         if (snapshot != null) {
@@ -809,7 +815,7 @@ fun DetailsSheetContent(
                                     val file = PdfExporter.exportPostToPdf(context, post, author!!, steps)
                                     isExporting = false
                                     if (file != null) {
-                                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        val uri = FileProvider.getUriForFile(
                                             context,
                                             "${context.packageName}.provider",
                                             file
@@ -1074,7 +1080,7 @@ fun CommentItem(
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val date = comment.createdAt.toDate()
-                    val sdf = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
+                    val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
                     Text(
                         text = sdf.format(date),
                         style = MaterialTheme.typography.labelSmall,

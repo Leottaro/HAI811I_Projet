@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 
 import android.net.Uri
@@ -56,6 +56,7 @@ import kotlinx.coroutines.withContext
 import java.util.*
 import kotlin.math.roundToInt
 import android.location.Geocoder
+import fr.cestnous.travelwow.BuildConfig
 
 // Geocoder is free for basic location search.
 // Routes API used for travel duration/distance.

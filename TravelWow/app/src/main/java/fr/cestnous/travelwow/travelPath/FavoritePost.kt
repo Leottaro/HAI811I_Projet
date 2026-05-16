@@ -1,5 +1,6 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
+import android.content.Context
 import androidx.room.*
 import com.google.firebase.Timestamp
 import java.util.Date
@@ -108,7 +109,7 @@ abstract class TravelWowDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: TravelWowDatabase? = null
 
-        fun getDatabase(context: android.content.Context): TravelWowDatabase {
+        fun getDatabase(context: Context): TravelWowDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

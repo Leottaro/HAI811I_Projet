@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import androidx.room.*
 import com.google.gson.Gson

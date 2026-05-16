@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.content.Intent
 import android.util.Log
@@ -26,6 +26,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.firestore
+import fr.cestnous.travelwow.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 

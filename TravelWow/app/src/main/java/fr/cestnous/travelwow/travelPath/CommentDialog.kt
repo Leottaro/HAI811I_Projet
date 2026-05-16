@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +27,7 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import fr.cestnous.travelwow.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -119,7 +121,7 @@ fun CommentDialog(
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_favorite), // Using ic_favorite as a placeholder for comment icon
+                                painter = painterResource(id = R.drawable.ic_favorite), // Using ic_favorite as a placeholder for comment icon
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -309,7 +311,7 @@ fun FirebaseCommentItem(comment: FirebaseComment, author: FirebaseUser) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 
-                val date = comment.createdAt?.toDate() ?: java.util.Date()
+                val date = comment.createdAt?.toDate() ?: Date()
                 val sdf = SimpleDateFormat("dd MMM", Locale.getDefault())
                 Text(
                     text = sdf.format(date),

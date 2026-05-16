@@ -1,9 +1,10 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +20,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
+import fr.cestnous.travelwow.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -280,7 +282,7 @@ fun UserDetailDialog(
                 }
             }
         },
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(28.dp),
         containerColor = MaterialTheme.colorScheme.surface,
     )
 }

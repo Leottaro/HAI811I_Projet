@@ -1,22 +1,19 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -30,8 +27,10 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.firebase.firestore.Query
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.firestore
 import com.google.maps.android.compose.*
+import fr.cestnous.travelwow.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -105,7 +104,7 @@ fun PostsGallery(
                         val firestorePosts = mutableListOf<FirebasePost>()
                         likedPostIds.chunked(30).forEach { chunk ->
                             val snapshot = db.collection("travelpath_posts")
-                                .whereIn(com.google.firebase.firestore.FieldPath.documentId(), chunk)
+                                .whereIn(FieldPath.documentId(), chunk)
                                 .get()
                                 .await()
                             firestorePosts.addAll(snapshot.toObjects(FirebasePost::class.java))

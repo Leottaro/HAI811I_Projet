@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -11,7 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
-import fr.cestnous.travelwow.ui.theme.TravelWowTheme
+import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 class MainActivity : ComponentActivity() {
 

@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -15,11 +15,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import fr.cestnous.travelwow.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,18 +166,18 @@ fun EditProfileScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.2f)),
+                            .background(Color.Black.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxWidth().height(32.dp),
-                            color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f)
+                            color = Color.Black.copy(alpha = 0.4f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_add),
                                     contentDescription = "Changer la photo",
-                                    tint = androidx.compose.ui.graphics.Color.White,
+                                    tint = Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -240,7 +243,7 @@ fun EditProfileScreen(
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         }

@@ -1,15 +1,14 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
 import android.util.Log
-import androidx.core.content.FileProvider
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -131,7 +130,7 @@ object PdfExporter {
                             .build()
                         val result = imageLoader.execute(request)
                         if (result is SuccessResult) {
-                            val bitmap = (result.drawable as android.graphics.drawable.BitmapDrawable).bitmap
+                            val bitmap = (result.drawable as BitmapDrawable).bitmap
                             
                             // Scale bitmap to fit
                             val maxWidth = PAGE_WIDTH - 2 * MARGIN
@@ -147,7 +146,7 @@ object PdfExporter {
                                 currentY = MARGIN
                             }
 
-                            val destRect = android.graphics.RectF(MARGIN, currentY, MARGIN + maxWidth, currentY + scaledHeight)
+                            val destRect = RectF(MARGIN, currentY, MARGIN + maxWidth, currentY + scaledHeight)
                             canvas.drawBitmap(bitmap, null, destRect, null)
                             currentY += scaledHeight + 10f
                         }

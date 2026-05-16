@@ -1,5 +1,6 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
+import android.content.Context
 import android.util.Log
 import kotlin.math.*
 
@@ -7,10 +8,8 @@ import kotlin.math.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
@@ -37,17 +36,20 @@ import com.cloudinary.android.callback.ErrorInfo
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.gms.maps.model.LatLng
-import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.SetOptions
 import com.google.gson.Gson
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.R
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.collections.get
 
-suspend fun uploadToCloudinary(uri: String, context: android.content.Context): String = suspendCancellableCoroutine { continuation ->
+suspend fun uploadToCloudinary(uri: String, context: Context): String = suspendCancellableCoroutine { continuation ->
     MediaManager.get().upload(uri.toUri())
-        .option("upload_preset", BuildConfig.CLOUDINARY_UPLOAD_PRESET)
         .option("unsigned", true)
         .callback(object : UploadCallback {
             override fun onStart(requestId: String) {}
@@ -167,7 +169,7 @@ fun TravelWowApp(
                     }
 
                     snapshot?.documentChanges?.forEach { dc ->
-                        if (dc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
+                        if (dc.type == DocumentChange.Type.ADDED) {
                             val notif = dc.document.toObject(FirebaseNotification::class.java)
                             
                             // Trigger local notification
@@ -241,7 +243,7 @@ fun TravelWowApp(
     var currentStepName by remember { mutableStateOf("") }
     var currentStepCategory by remember { mutableStateOf("") }
     var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
-    var currentStepLocation by remember { mutableStateOf(com.google.android.gms.maps.model.LatLng(43.6107, 3.8767)) }
+    var currentStepLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
     
     val sheetState = rememberStandardBottomSheetState(
         initialValue = SheetValue.PartiallyExpanded
@@ -560,7 +562,7 @@ fun TravelWowApp(
                                 finalPhotoUrl?.let { updates["photoUrl"] = it }
                                 
                                 db.collection("users").document(user.uid)
-                                    .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                                    .set(updates, SetOptions.merge())
                                     .await()
                                 
                                 Log.d("TravelWowApp", "Firestore profile updated")

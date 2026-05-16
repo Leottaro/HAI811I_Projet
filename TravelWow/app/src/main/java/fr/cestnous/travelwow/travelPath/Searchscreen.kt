@@ -1,7 +1,6 @@
-package fr.cestnous.travelwow
+package fr.cestnous.travelwow.travelPath
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,8 +18,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import fr.cestnous.travelwow.ui.theme.TravelWowTheme
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +69,7 @@ fun SearchTopBar(
                 ) {
                     Icon(
                         painter = painterResource(
-                            if (isAddingStep || isAdding || isPostSelected) R.drawable.ic_return 
+                            if (isAddingStep || isAdding || isPostSelected) R.drawable.ic_return
                             else R.drawable.ic_add
                         ),
                         contentDescription = if (isAddingStep || isAdding || isPostSelected) "Retour" else "Ajouter",
@@ -151,7 +150,7 @@ fun SearchTopBar(
                         ) {
                             Text(
                                 "Ajouter",
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                fontWeight = FontWeight.Bold,
                                 color = if (canConfirmStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             )
                         }
@@ -163,7 +162,7 @@ fun SearchTopBar(
                         ) {
                             Text(
                                 "Partager",
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                fontWeight = FontWeight.Bold,
                                 color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             )
                         }
@@ -348,7 +347,12 @@ fun SearchScreen(
 fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
-            SearchTopBar(searchQuery = "", onSearchQueryChange = {}, onAddClick = {}, viewMode = GalleryViewMode.GRID, onViewModeChange = {})
+            SearchTopBar(
+                searchQuery = "",
+                onSearchQueryChange = {},
+                onAddClick = {},
+                viewMode = GalleryViewMode.GRID,
+                onViewModeChange = {})
             SearchScreen(onPostClick = {}, viewMode = GalleryViewMode.GRID)
         }
     }
