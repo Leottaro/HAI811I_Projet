@@ -12,6 +12,9 @@ import android.util.Log
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseUser
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat

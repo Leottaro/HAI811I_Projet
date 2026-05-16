@@ -39,8 +39,24 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.SetOptions
 import com.google.gson.Gson
-import fr.cestnous.travelwow.BuildConfig
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.local.LocalDraft
+import fr.cestnous.travelwow.travelPath.data.local.TravelWowDatabase
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseNotification
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseUser
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseUserSettings
+import fr.cestnous.travelwow.travelPath.data.model.NotificationType
+import fr.cestnous.travelwow.travelPath.data.model.PostFilter
+import fr.cestnous.travelwow.travelPath.ui.profile.EditProfileScreen
+import fr.cestnous.travelwow.travelPath.ui.screen.AddStepScreen
+import fr.cestnous.travelwow.travelPath.ui.screen.CreatePostContent
+import fr.cestnous.travelwow.travelPath.ui.screen.DetailsSheetContent
+import fr.cestnous.travelwow.travelPath.ui.screen.DraftSuccessDialog
+import fr.cestnous.travelwow.travelPath.ui.screen.DraftsGallery
+import fr.cestnous.travelwow.travelPath.ui.screen.PostSuccessDialog
+import fr.cestnous.travelwow.travelPath.ui.screen.TravelStep
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -412,13 +428,15 @@ fun TravelWowApp(
                                             title = postTitle,
                                             locationName = firebaseSteps.firstOrNull()!!.name,
                                             description = postDescription,
-                                            mainImageUrl = firebaseSteps.flatMap { it.imageUrls }.firstOrNull(),
+                                            mainImageUrl = firebaseSteps.flatMap { it.imageUrls }
+                                                .firstOrNull(),
                                             latitude = firebaseSteps.firstOrNull()!!.latitude,
                                             longitude = firebaseSteps.firstOrNull()!!.longitude,
                                             distanceKm = (totalDistance * 10).roundToInt() / 10.0,
                                             durationMinutes = 0,
                                             steps = firebaseSteps,
-                                            categories = firebaseSteps.map { it.category }.filter { it.isNotBlank() }.distinct(),
+                                            categories = firebaseSteps.map { it.category }
+                                                .filter { it.isNotBlank() }.distinct(),
                                         )
                                         
                                         postRef.set(post).await()
@@ -451,18 +469,20 @@ fun TravelWowApp(
                                                             .await()
 
                                                         profiles.documents.forEach { profileDoc ->
-                                                            val profile = profileDoc.toObject(FirebaseUser::class.java)
+                                                            val profile = profileDoc.toObject(
+                                                                FirebaseUser::class.java)
                                                             if (profile?.settings?.followersPostsNotifications == true) {
-                                                                val notification = FirebaseNotification(
-                                                                    recipientId = profileDoc.id,
-                                                                    senderId = user.uid,
-                                                                    senderName = senderName,
-                                                                    senderPhotoUrl = userProfile?.photoUrl,
-                                                                    type = NotificationType.NEW_POST,
-                                                                    targetId = postId,
-                                                                    title = "Nouveau parcours !",
-                                                                    message = "$senderName a publié un nouveau parcours : \"$postTitle\"."
-                                                                )
+                                                                val notification =
+                                                                    FirebaseNotification(
+                                                                        recipientId = profileDoc.id,
+                                                                        senderId = user.uid,
+                                                                        senderName = senderName,
+                                                                        senderPhotoUrl = userProfile?.photoUrl,
+                                                                        type = NotificationType.NEW_POST,
+                                                                        targetId = postId,
+                                                                        title = "Nouveau parcours !",
+                                                                        message = "$senderName a publié un nouveau parcours : \"$postTitle\"."
+                                                                    )
                                                                 db.collection("notifications").add(notification)
                                                             }
                                                         }
@@ -537,50 +557,59 @@ fun TravelWowApp(
             },
             content = { innerPadding ->
                 if (showEditProfile) {
-                EditProfileScreen(
-                    userId = user.uid,
-                    currentUsername = userProfile?.username ?: "Utilisateur inconnu",
-                    currentBio = userProfile?.bio ?: "",
-                    currentPhotoUri = userProfile?.photoUrl,
-                    onBack = { showEditProfile = false },
-                    onSave = { newName, newBio, newPhotoUri ->
-                        coroutineScope.launch {
-                            try {
-                                Log.d("TravelWowApp", "Starting profile save to Cloudinary. PhotoUri: $newPhotoUri")
-                                var finalPhotoUrl = newPhotoUri
-                                
-                                // Upload image to Cloudinary if it's a local URI
-                                if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith("file://"))) {
-                                    finalPhotoUrl = uploadToCloudinary(newPhotoUri, context)
-                                    Log.d("TravelWowApp", "Profile pic upload successful: $finalPhotoUrl")
-                                }
+                    EditProfileScreen(
+                        userId = user.uid,
+                        currentUsername = userProfile?.username ?: "Utilisateur inconnu",
+                        currentBio = userProfile?.bio ?: "",
+                        currentPhotoUri = userProfile?.photoUrl,
+                        onBack = { showEditProfile = false },
+                        onSave = { newName, newBio, newPhotoUri ->
+                            coroutineScope.launch {
+                                try {
+                                    Log.d(
+                                        "TravelWowApp",
+                                        "Starting profile save to Cloudinary. PhotoUri: $newPhotoUri"
+                                    )
+                                    var finalPhotoUrl = newPhotoUri
 
-                                val updates = mutableMapOf<String, Any>(
-                                    "username" to newName,
-                                    "bio" to newBio
-                                )
-                                finalPhotoUrl?.let { updates["photoUrl"] = it }
-                                
-                                db.collection("users").document(user.uid)
-                                    .set(updates, SetOptions.merge())
-                                    .await()
-                                
-                                Log.d("TravelWowApp", "Firestore profile updated")
-                                
-                                userProfile = userProfile?.copy(
-                                    username = newName,
-                                    bio = newBio,
-                                    photoUrl = finalPhotoUrl
-                                )
-                                showEditProfile = false
-                            } catch (e: Exception) {
-                                Log.e("TravelWowApp", "Error saving profile: ${e.message}", e)
-                                // In a real app, show a Snackbar here
+                                    // Upload image to Cloudinary if it's a local URI
+                                    if (newPhotoUri != null && (newPhotoUri.startsWith("content://") || newPhotoUri.startsWith(
+                                            "file://"
+                                        ))
+                                    ) {
+                                        finalPhotoUrl = uploadToCloudinary(newPhotoUri, context)
+                                        Log.d(
+                                            "TravelWowApp",
+                                            "Profile pic upload successful: $finalPhotoUrl"
+                                        )
+                                    }
+
+                                    val updates = mutableMapOf<String, Any>(
+                                        "username" to newName,
+                                        "bio" to newBio
+                                    )
+                                    finalPhotoUrl?.let { updates["photoUrl"] = it }
+
+                                    db.collection("users").document(user.uid)
+                                        .set(updates, SetOptions.merge())
+                                        .await()
+
+                                    Log.d("TravelWowApp", "Firestore profile updated")
+
+                                    userProfile = userProfile?.copy(
+                                        username = newName,
+                                        bio = newBio,
+                                        photoUrl = finalPhotoUrl
+                                    )
+                                    showEditProfile = false
+                                } catch (e: Exception) {
+                                    Log.e("TravelWowApp", "Error saving profile: ${e.message}", e)
+                                    // In a real app, show a Snackbar here
+                                }
                             }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
             } else if (showSettings) {
                 SettingsScreen(
                     settings = userProfile?.settings ?: FirebaseUserSettings(),
@@ -622,7 +651,8 @@ fun TravelWowApp(
                                             stepImages = currentStepImages,
                                             onStepImagesChange = { currentStepImages = it },
                                             onLocationSelected = { currentStepLocation = it },
-                                            lastStepLocation = postSteps.lastOrNull()?.let { LatLng(it.latitude, it.longitude) },
+                                            lastStepLocation = postSteps.lastOrNull()
+                                                ?.let { LatLng(it.latitude, it.longitude) },
                                             modifier = Modifier
                                         )
                                     } else if (showCreatePost) {
@@ -635,15 +665,19 @@ fun TravelWowApp(
                                             onDescriptionChange = { postDescription = it },
                                             steps = postSteps,
                                             onAddStepClick = { showAddStep = true },
-                                            onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
+                                            onRemoveStep = { step ->
+                                                postSteps = postSteps.filter { it.id != step.id }
+                                            },
                                             onStepsChange = { postSteps = it },
                                             onSaveDraft = {
                                                 isSavingDraft = true
                                                 coroutineScope.launch {
                                                     try {
-                                                        val draftId = editingDraftId ?: db.collection("users").document(user.uid)
-                                                            .collection("drafts").document().id
-                                                        
+                                                        val draftId =
+                                                            editingDraftId ?: db.collection("users")
+                                                                .document(user.uid)
+                                                                .collection("drafts").document().id
+
                                                         // Save to local DB first
                                                         val localDraft = LocalDraft(
                                                             id = draftId,
@@ -658,9 +692,11 @@ fun TravelWowApp(
 
                                                         // Try to save to Firestore
                                                         try {
-                                                            val draftRef = db.collection("users").document(user.uid)
-                                                                .collection("drafts").document(draftId)
-                                                            
+                                                            val draftRef = db.collection("users")
+                                                                .document(user.uid)
+                                                                .collection("drafts")
+                                                                .document(draftId)
+
                                                             val draftMap = hashMapOf(
                                                                 "title" to postTitle,
                                                                 "description" to postDescription,
@@ -676,24 +712,36 @@ fun TravelWowApp(
                                                                 "createdAt" to FieldValue.serverTimestamp()
                                                             )
                                                             draftRef.set(draftMap).await()
-                                                            
+
                                                             // Mark as synced if successful
-                                                            draftDao.insertDraft(localDraft.copy(isSynced = true))
+                                                            draftDao.insertDraft(
+                                                                localDraft.copy(
+                                                                    isSynced = true
+                                                                )
+                                                            )
                                                         } catch (e: Exception) {
-                                                            Log.e("TravelWowApp", "Error syncing draft to Firestore, will stay local", e)
+                                                            Log.e(
+                                                                "TravelWowApp",
+                                                                "Error syncing draft to Firestore, will stay local",
+                                                                e
+                                                            )
                                                         }
-                                                        
+
                                                         // Reset and close
                                                         showCreatePost = false
                                                         postTitle = ""
                                                         postDescription = ""
                                                         postSteps = emptyList()
                                                         editingDraftId = null
-                                                        
+
                                                         // Show success message
-                                                        showDraftSuccessDialog = true 
+                                                        showDraftSuccessDialog = true
                                                     } catch (e: Exception) {
-                                                        Log.e("TravelWowApp", "Error saving draft", e)
+                                                        Log.e(
+                                                            "TravelWowApp",
+                                                            "Error saving draft",
+                                                            e
+                                                        )
                                                     } finally {
                                                         isSavingDraft = false
                                                     }
@@ -804,7 +852,7 @@ fun TravelWowApp(
                                                     editingDraftId = draft.id
                                                     postTitle = draft.title
                                                     postDescription = draft.description
-                                                    postSteps = draft.steps.map { s -> 
+                                                    postSteps = draft.steps.map { s ->
                                                         TravelStep(
                                                             name = s.name,
                                                             category = s.category,

@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*

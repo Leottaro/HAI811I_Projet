@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.model.PostFilter
 import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 @OptIn(ExperimentalMaterial3Api::class)

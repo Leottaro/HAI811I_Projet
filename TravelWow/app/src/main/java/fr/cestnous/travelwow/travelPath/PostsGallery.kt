@@ -31,6 +31,11 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.firestore
 import com.google.maps.android.compose.*
 import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.local.FavoritePost
+import fr.cestnous.travelwow.travelPath.data.local.TravelWowDatabase
+import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
+import fr.cestnous.travelwow.travelPath.data.model.PostFilter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
