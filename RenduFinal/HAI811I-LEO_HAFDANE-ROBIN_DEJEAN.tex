@@ -1,0 +1,565 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage[top=2cm, bottom=2cm, left=2cm, right=2cm]{geometry}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bookmark}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{minted}
+\usepackage{ragged2e}
+\usepackage{xcolor}
+\usepackage{yfonts}
+\usepackage{titling}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{multicol}
+\usepackage{tabto}
+\usepackage{svg}
+\usepackage{array}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{csvsimple}
+\usepackage{booktabs}
+\usepackage{subfig}
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.15}
+\usepackage{mathrsfs}
+\usetikzlibrary{arrows}
+
+\usepackage[normalem]{ulem}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\frenchsetup{StandardLayout=true}
+
+\setlength{\droptitle}{-5em}  
+\pretitle{\centering\LARGE\bfseries}
+\posttitle{\par\vskip 1cm}
+\preauthor{\centering\large}
+\postauthor{\par}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!red,
+  urlcolor=blue!70!black
+}
+\captionsetup[subfigure]{labelformat=empty} % Disable subfigure caption numbering
+\setlength{\floatsep}{5pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{5pt plus 2pt minus 2pt}
+\setlength{\intextsep}{5pt plus 2pt minus 2pt}
+
+
+
+
+
+\title{
+    HAI811I – Programmation mobile \\ 
+    \large Rapport final de projet
+}
+\date{\today}
+\author{Robin Dejean et Léo Hafdane \\ \textit{\url{https://github.com/Leottaro/HAI811I_Projet}}}
+\renewcommand{\contentsname}{Table des matières}
+
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\maketitle
+\begin{center}
+    \vfill
+    M1 Informatique – IMAGINE \\ Faculté des Sciences \\ Université de Montpellier \\
+    \includegraphics[width=0.225\textwidth]{ressources/logo_UM.png}
+\end{center}
+
+\begin{justify}
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+
+
+
+\section*{Résumé du projet}
+
+Ce projet de programmation mobile repose sur la réalisation de deux applications Android complémentaires : \textbf{TravelShare} et \textbf{TravelPath}. Les applications ont été développées en Kotlin avec Jetpack Compose et s'appuient sur une architecture moderne orientée composants et services.
+
+Le travail réalisé couvre l'ensemble du cycle de développement :
+\begin{itemize}
+    \item conception de l'architecture applicative ;
+    \item mise en place de l'authentification et de la gestion des utilisateurs ;
+    \item intégration d'une base de données temps réel avec Firebase Firestore ;
+    \item gestion du stockage et de l'upload des médias via Cloudinary ;
+    \item développement d'interfaces modernes avec Jetpack Compose ;
+    \item implémentation de fonctionnalités sociales et de navigation ;
+    \item optimisation de la gestion des états et du cache local.
+\end{itemize}
+
+Les deux projets partagent plusieurs composants techniques communs afin de garantir une cohérence de développement et de faciliter la maintenance du code.
+
+\section*{Fonctionnalités implémentées}
+
+\subsection*{Fonctionnalités communes}
+
+\begin{itemize}
+    \item Authentification utilisateur avec Firebase Authentication ;
+    \item Création et personnalisation de profils utilisateurs ;
+    \item Gestion des sessions et déconnexion sécurisée ;
+    \item Upload et stockage d'images via Cloudinary ;
+    \item Synchronisation des données avec Firebase Firestore ;
+    \item Interfaces modernes développées avec Jetpack Compose ;
+    \item Navigation dynamique entre les écrans ;
+    \item Gestion des permissions Android ;
+    \item Notifications push avec Firebase Cloud Messaging ;
+    \item Gestion des erreurs et des états de chargement.
+\end{itemize}
+
+\subsection*{Fonctionnalités spécifiques à TravelShare}
+
+\begin{itemize}
+    \item Publication et partage de contenus multimédias ;
+    \item Consultation des publications des autres utilisateurs ;
+    \item Système d'interactions sociales ;
+    \item Gestion des profils et des contenus associés ;
+    \item Rafraîchissement dynamique des données utilisateur.
+\end{itemize}
+
+\subsection*{Fonctionnalités spécifiques à TravelPath}
+
+\begin{itemize}
+    \item Gestion d'itinéraires et de favoris ;
+    \item Mise en cache locale avec Room ;
+    \item Synchronisation des données utilisateur ;
+    \item Sauvegarde et restauration des préférences ;
+    \item Gestion optimisée des données hors ligne.
+\end{itemize}
+
+\section*{Architecture et choix techniques}
+
+\subsection*{Architecture générale}
+
+Les applications suivent une architecture modulaire inspirée du modèle MVVM (Model -- View -- ViewModel). Cette organisation permet de séparer clairement :
+\begin{itemize}
+    \item la logique métier ;
+    \item l'interface utilisateur ;
+    \item l'accès aux données ;
+    \item les services externes.
+\end{itemize}
+
+Jetpack Compose est utilisé pour la couche interface utilisateur tandis que Firebase et Cloudinary assurent la gestion des données distantes et des médias.
+
+\subsection*{Technologies utilisées}
+
+\begin{itemize}
+    \item \textbf{Kotlin} : langage principal des applications ;
+    \item \textbf{Jetpack Compose} : développement déclaratif des interfaces ;
+    \item \textbf{Firebase Authentication} : gestion des comptes utilisateurs ;
+    \item \textbf{Firebase Firestore} : stockage des données ;
+    \item \textbf{Firebase Cloud Messaging} : notifications push ;
+    \item \textbf{Cloudinary} : hébergement et optimisation des médias ;
+    \item \textbf{Room} : persistance locale des données ;
+    \item \textbf{Coil} : chargement et affichage des images.
+\end{itemize}
+
+\subsection*{Choix de conception}
+
+Plusieurs choix techniques ont été réalisés afin d'assurer la maintenabilité et les performances des applications :
+\begin{itemize}
+    \item centralisation des services externes ;
+    \item séparation des responsabilités entre composants ;
+    \item gestion réactive des états avec Compose ;
+    \item utilisation d'un cache local pour limiter les accès réseau ;
+    \item sécurisation des échanges via HTTPS ;
+    \item externalisation des clés sensibles dans \texttt{local.properties}.
+\end{itemize}
+
+\section*{Travail réalisé}
+
+
+
+\subsection*{Général}
+
+Les deux sous-projets partagent une infrastructure commune reposant sur Firebase (Auth, Firestore, Cloud Messaging) et Cloudinary pour le stockage des médias.
+
+\subsubsection*{Authentification utilisateur}
+
+\begin{itemize}
+
+    \item \textbf{Authentification Firebase.}
+    Les deux applications s'appuient sur le SDK \texttt{firebase-auth} (Kotlin). L'état de session est observé dans \texttt{MainActivity} via un \texttt{mutableStateOf} Compose : à la connexion, l'interface principale est chargée ; à la déconnexion, l'\texttt{AuthScreen} reprend la main.
+
+    \item \textbf{Gestion de session.}
+    TravelShare utilise \texttt{key(currentUser.\allowbreak{}uid)} pour forcer la recréation complète du graphe de navigation lors d'un changement d'utilisateur, évitant les fuites de ViewModel. TravelPath purge le cache local Room des favoris au logout pour éviter toute fuite de données entre comptes.
+
+    \item \textbf{Profils personnalisables.}
+    Les deux applications maintiennent un document utilisateur dans Firestore (\texttt{/\allowbreak{}users/\allowbreak{}\{uid\}}) avec pseudo, bio et photo de profil. La photo est uploadée sur Cloudinary avant que l'URL sécurisée soit persistée dans Firestore.
+    \newline\textit{Dépendances communes :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-auth-ktx}, \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore-ktx}, \texttt{com.\allowbreak{}cloudinary:\allowbreak{}cloudinary-android}, \texttt{io.\allowbreak{}coil-kt:\allowbreak{}coil-compose}.
+
+\end{itemize}
+
+\subsubsection*{Upload de médias (Cloudinary)}
+
+\begin{itemize}
+
+    \item \textbf{Initialisation.}
+    \texttt{MediaManager.\allowbreak{}init()} est appelé dans \texttt{TravelWowApplication.\allowbreak{}onCreate()} avec le \texttt{cloud\_name} issu de \texttt{BuildConfig} (injecté depuis \texttt{local.\allowbreak{}properties} via Gradle, non versionné). L'option \texttt{secure = true} force l'utilisation d'URLs HTTPS.
+
+    \item \textbf{Upload.}
+    Les deux projets envoient les images via \texttt{MediaManager} et stockent les URLs publiques retournées dans Firestore. TravelPath encapsule l'upload dans une coroutine suspendue (\texttt{suspendCancellableCoroutine}) ; TravelShare utilise \texttt{MediaManager.\allowbreak{}get().\allowbreak{}upload(uri).\allowbreak{}dispatch()}.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}cloudinary:\allowbreak{}cloudinary-android}.
+
+\end{itemize}
+
+\subsubsection*{Notifications}
+
+\begin{itemize}
+
+    \item \textbf{Firebase Cloud Messaging (FCM).}
+    Les deux applications déclarent un service étendant \texttt{FirebaseMessagingService}. \texttt{onNewToken()} met à jour le champ \texttt{fcmToken} du document utilisateur Firestore. \texttt{onMessageReceived()} affiche une notification système locale.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-messaging-ktx}, \texttt{androidx.\allowbreak{}core:\allowbreak{}core-ktx}.
+
+    \item \textbf{Notifications in-app temps réel.}
+    Un écouteur Firestore (\texttt{addSnapshotListener} ou \texttt{callbackFlow}) surveille la collection \texttt{notifications} filtrée sur l'utilisateur courant et les entrées non lues. À chaque nouvelle notification, une notification système Android est déclenchée, puis le document est marqué comme lu. Le canal de notification (\texttt{NotificationChannel}) est créé pour Android 8+.
+
+    \item \textbf{Permission Android 13+.}
+    La permission \texttt{POST\_NOTIFICATIONS} (requise depuis API 33) est demandée au démarrage via \texttt{ActivityResultContracts.\allowbreak{}RequestPermission()} dans \texttt{MainActivity}.
+    \newline\textit{Dépendances :} \texttt{androidx.\allowbreak{}activity:\allowbreak{}activity-ktx}, \texttt{androidx.\allowbreak{}core:\allowbreak{}core-ktx}.
+
+\end{itemize}
+
+
+\subsection*{Spécifique TravelShare}
+
+\subsubsection*{Authentification}
+
+\begin{itemize}
+
+    \item \textbf{Connexion email/mot de passe et inscription.}
+    \texttt{FirebaseAuth.\allowbreak{}signInWithEmailAndPassword()} pour la connexion ; \texttt{createUserWithEmailAndPassword()} pour l'inscription, suivie de la création d'un document \texttt{UserProfile} dans Firestore. Le pseudo est vérifié en amont avec une requête \texttt{whereEqualTo("username", ...)} pour garantir l'unicité.
+
+    \item \textbf{Mode anonyme.}
+    \texttt{FirebaseAuth.\allowbreak{}signInAnonymously()} permet un accès limité. Le flag \texttt{isAnonymous} conditionne l'accès aux fonctionnalités connectées dans toute l'application.
+
+\end{itemize}
+
+\subsubsection*{Feed \& Filtrage}
+
+\begin{itemize}
+
+    \item \textbf{Flux temps réel.}
+    \texttt{PhotoRepository.\allowbreak{}getPhotosFlow()} utilise \texttt{addSnapshotListener} Firestore encapsulé dans un \texttt{callbackFlow} Kotlin. Le ViewModel collecte ce Flow et expose les photos via un \texttt{StateFlow<List<TravelPhoto>>}.
+
+    \item \textbf{Filtrage par type de lieu.}
+    Le champ \texttt{placeType:\allowbreak{} String} du modèle \texttt{TravelPhoto} (valeurs : \texttt{"Nature"}, \texttt{"Musée"}, \texttt{"Rue"}, \texttt{"Autre"}) permet un filtre côté client dans le ViewModel.
+
+    \item \textbf{Recherche textuelle.}
+    \texttt{PhotoRepository.\allowbreak{}searchPhotos()} récupère toutes les photos publiques, puis filtre en mémoire sur \texttt{description}, \texttt{locationName} et \texttt{tags} via \texttt{String.\allowbreak{}contains(ignoreCase = true)}.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}, \texttt{io.\allowbreak{}coil-kt:\allowbreak{}coil-compose}.
+
+\end{itemize}
+
+\subsubsection*{Vue carte (OSMDroid)}
+
+\begin{itemize}
+
+    \item \textbf{Carte interactive.}
+    \texttt{MapView} OSMDroid embarquée dans un \texttt{AndroidView} Compose. Les tuiles sont fournies par OpenStreetMap (aucune clé API requise). La configuration OSMDroid est initialisée dans \texttt{TravelWowApplication} avec les \texttt{SharedPreferences} par défaut.
+
+    \item \textbf{Markers.}
+    Pour chaque \texttt{TravelPhoto} disposant de coordonnées non nulles, un \texttt{Marker} est ajouté. Un clic navigue vers \texttt{PhotoDetailScreen} avec le flag \texttt{fromMap = true} pour gérer correctement le retour arrière.
+    \newline\textit{Dépendances :} \texttt{org.\allowbreak{}osmdroid:\allowbreak{}osmdroid-android}, \texttt{org.\allowbreak{}osmdroid:\allowbreak{}osmdroid-wms}.
+
+\end{itemize}
+
+\subsubsection*{Détail d'une publication}
+
+\begin{itemize}
+
+    \item \textbf{Like / Unlike.}
+    \texttt{PhotoRepository.\allowbreak{}toggleLike()} utilise une \textbf{transaction Firestore} (\texttt{db.\allowbreak{}runTransaction}) pour lire \texttt{likedBy}, incrémenter/décrémenter \texttt{likesCount} atomiquement et mettre à jour \texttt{FieldValue.\allowbreak{}arrayUnion/\allowbreak{}arrayRemove}, évitant les race conditions.
+
+    \item \textbf{Signalement.}
+    \texttt{PhotoRepository.\allowbreak{}reportPhoto()} crée un document dans la collection \texttt{reports} avec \texttt{photoId}, \texttt{reporterId}, \texttt{timestamp} et \texttt{status = "En attente"}.
+
+    \item \textbf{Suppression / Modification.}
+    Suppression via \texttt{photosCollection.\allowbreak{}document(photoId).\allowbreak{}delete()}. La modification navigue vers \texttt{UploadScreen} avec le \texttt{TravelPhoto} passé en paramètre.
+
+    \item \textbf{Itinéraire.}
+    Un \texttt{Intent(Intent.\allowbreak{}ACTION\_VIEW)} avec l'URI \texttt{geo:\allowbreak{}0,0?q=<locationName>} ouvre Google Maps ou toute application de navigation installée.
+
+    \item \textbf{Commentaires.}
+    Flux temps réel depuis la sous-collection \texttt{photos/\allowbreak{}\{photoId\}/\allowbreak{}comments} via \texttt{PhotoRepository.\allowbreak{}getCommentsFlow()} (pattern \texttt{callbackFlow} + \texttt{addSnapshotListener}). L'ajout d'un commentaire appelle \texttt{addComment()} qui écrit dans la sous-collection puis déclenche une notification pour l'auteur.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}, \texttt{android.\allowbreak{}content.\allowbreak{}Intent}.
+
+\end{itemize}
+
+\subsubsection*{Publication}
+
+\begin{itemize}
+
+    \item \textbf{Sélection d'images.}
+    \texttt{ActivityResultContracts.\allowbreak{}GetMultipleContents("image/\allowbreak{}*")} permet la sélection multi-images depuis la galerie.
+
+    \item \textbf{Sauvegarde Firestore.}
+    Un objet \texttt{TravelPhoto} est créé avec \texttt{authorId}, \texttt{authorName}, \texttt{imageUrls}, \texttt{locationName}, \texttt{placeType}, \texttt{tags}, \texttt{description}, \texttt{timestamp} et \texttt{isPublic = true}.
+
+    \item \textbf{Mode édition.}
+    \texttt{UploadScreen} accepte un paramètre optionnel \texttt{editingPhoto:\allowbreak{} TravelPhoto?}. Si présent, les champs sont pré-remplis et la sauvegarde effectue un \texttt{update()} sur le document existant au lieu d'un \texttt{add()}.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}cloudinary:\allowbreak{}cloudinary-android}, \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}.
+
+\end{itemize}
+
+\subsubsection*{Social (amis)}
+
+\begin{itemize}
+
+    \item \textbf{Recherche d'utilisateurs.}
+    \texttt{UserRepository.\allowbreak{}searchUsers(query)} utilise les opérateurs Firestore \texttt{whereGreaterThanOrEqualTo} + \texttt{whereLessThanOrEqualTo} avec le suffixe \texttt{"\textbackslash uf8ff"} pour simuler une recherche par préfixe sur \texttt{username}. L'utilisateur courant est exclu des résultats.
+
+    \item \textbf{Envoi de demande d'ami.}
+    \texttt{FriendRepository.\allowbreak{}sendFriendRequest()} vérifie l'absence de doublon, crée un \texttt{FriendRequest} avec \texttt{status = "PENDING"} dans la collection \texttt{friendRequests}, puis crée une \texttt{AppNotification} pour le destinataire.
+
+    \item \textbf{Acceptation / Refus.}
+    L'acceptation utilise un \textbf{batch Firestore} atomique : passage du statut à \texttt{"ACCEPTED"} et ajout mutuel des UIDs dans les tableaux \texttt{friends} via \texttt{FieldValue.\allowbreak{}arrayUnion}. Le refus est un simple \texttt{delete()} du document \texttt{FriendRequest}.
+
+    \item \textbf{Demandes entrantes.}
+    \texttt{getIncomingRequestsFlow(userId)} écoute en temps réel les \texttt{friendRequests} où \texttt{toId == userId} et \texttt{status == "PENDING"}.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}.
+
+\end{itemize}
+
+\subsubsection*{Messagerie}
+
+\begin{itemize}
+
+    \item \textbf{Chat 1-to-1.}
+    L'ID de conversation est déterminé de façon déterministe par \texttt{getChatId()} (tri lexicographique des UIDs : \texttt{"uid1\_uid2"}), garantissant l'unicité. Les messages sont stockés dans \texttt{chats/\allowbreak{}\{chatId\}/\allowbreak{}messages}.
+
+    \item \textbf{Chat de groupe.}
+    Les groupes sont stockés dans la collection \texttt{groups}. \texttt{createGroup()} crée le document avec la liste des membres. Les messages sont dans \texttt{groups/\allowbreak{}\{groupId\}/\allowbreak{}messages}.
+
+    \item \textbf{Flux temps réel.}
+    \texttt{getMessagesFlow()} et \texttt{getGroupMessagesFlow()} utilisent \texttt{addSnapshotListener} avec tri par \texttt{timestamp ASC} encapsulés en \texttt{callbackFlow}.
+
+    \item \textbf{Partage de photo.}
+    \texttt{ChatMessage} dispose d'un champ optionnel \texttt{photoId:\allowbreak{} String?}. Le destinataire peut appuyer sur le message pour naviguer vers \texttt{PhotoDetailScreen}.
+
+    \item \textbf{Notifications à l'envoi.}
+    \texttt{sendMessage()} crée systématiquement une \texttt{AppNotification} après l'envoi. Pour les groupes, \texttt{sendGroupMessage()} crée une notification pour chaque membre sauf l'expéditeur.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}.
+
+\end{itemize}
+
+\subsubsection*{Favoris}
+
+\begin{itemize}
+
+    \item Les favoris correspondent aux photos likées : requête Firestore \texttt{whereArrayContains("likedBy", userId)} sur la collection \texttt{photos}, exposée via un Flow temps réel.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore}.
+
+\end{itemize}
+
+
+\subsection*{Spécifique TravelPath}
+
+\subsubsection*{Authentification \& Gestion du profil}
+
+\begin{itemize}
+
+    \item \textbf{Profils enrichis.}
+    Le document \texttt{/\allowbreak{}users/\allowbreak{}\{uid\}} contient en plus les champs \texttt{fcmToken}, \texttt{followersCount}, \texttt{followingCount} et un sous-objet \texttt{settings}. Les modifications sont gérées depuis \texttt{EditProfileScreen}.
+
+    \item \textbf{Statistiques utilisateur.}
+    Les compteurs \texttt{followersCount} et \texttt{followingCount} sont mis à jour via \texttt{FieldValue.\allowbreak{}increment(±1)} lors de chaque follow/unfollow. Le nombre de publications est calculé à la volée par une requête \texttt{whereEqualTo("authorId", uid).\allowbreak{}get()}.
+
+    \item \textbf{Paramètres.}
+    L'\texttt{SettingsScreen} expose quatre toggles de notifications gérés localement via \texttt{mutableStateOf}, puis sauvegardés en bloc dans Firestore à la confirmation d'une \texttt{AlertDialog}.
+
+    \item \textbf{Système d'abonnements (follow/unfollow).}
+    Modélisé par deux sous-collections miroir : \texttt{/\allowbreak{}users/\allowbreak{}\{myId\}/\allowbreak{}following/\allowbreak{}\{targetId\}} et \texttt{/\allowbreak{}users/\allowbreak{}\{targetId\}/\allowbreak{}followers/\allowbreak{}\{myId\}}. L'état \texttt{isFollowing} est initialisé au chargement via \texttt{.\allowbreak{}get().\allowbreak{}await()}.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-firestore-ktx}, \texttt{kotlinx-coroutines-play-services}.
+
+    \item \textbf{Profil public.}
+    \texttt{UserDetailDialog} charge le document \texttt{/\allowbreak{}users/\allowbreak{}\{userId\}} et le nombre de posts, et embarque un \texttt{PostsGallery} filtré par \texttt{userIdFilter}.
+
+\end{itemize}
+
+\subsubsection*{Création de parcours de visite}
+
+\begin{itemize}
+
+    \item \textbf{Parcours en plusieurs étapes.}
+    L'état de création (titre, description, liste de \texttt{TravelStep}) est porté par des \texttt{mutableStateOf} dans \texttt{TravelWowApp} et transmis aux composables \texttt{CreatePostContent} et \texttt{AddStepScreen}. La confirmation d'une étape ajoute un \texttt{TravelStep} via \texttt{postSteps + TravelStep(...)}.
+
+    \item \textbf{Géolocalisation (sélection de lieu).}
+    \texttt{AddStepScreen} intègre une \texttt{GoogleMap} (Compose) permettant de placer une épingle. La distance totale est calculée via la formule de Haversine (\texttt{calculateTotalDistance}).
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}maps.\allowbreak{}android:\allowbreak{}maps-compose}, \texttt{com.\allowbreak{}google.\allowbreak{}android.\allowbreak{}gms:\allowbreak{}play-services-maps}.
+
+    \item \textbf{Publication Firestore.}
+    Un \texttt{DocumentReference} est créé avec \texttt{db.\allowbreak{}collection("travelpath\_posts").\allowbreak{}document()} pour récupérer l'ID avant écriture. Chaque \texttt{FirebaseStep} est ensuite écrit dans la sous-collection \texttt{/\allowbreak{}steps/\allowbreak{}\{stepId\}}.
+
+    \item \textbf{Brouillons (persistance hybride).}
+    Un \texttt{LocalDraft} est d'abord inséré dans Room (stratégie \texttt{REPLACE}, \texttt{isSynced = false}), garantissant la disponibilité hors-ligne. Une synchronisation Firestore est tentée ensuite ; en cas de succès, le draft est mis à jour avec \texttt{isSynced = true}. Les étapes sont sérialisées en JSON via Gson.
+    \newline\textit{Dépendances :} \texttt{androidx.\allowbreak{}room:\allowbreak{}room-runtime}, \texttt{androidx.\allowbreak{}room:\allowbreak{}room-ktx}, \texttt{com.\allowbreak{}google.\allowbreak{}code.\allowbreak{}gson:\allowbreak{}gson}.
+
+\end{itemize}
+
+\subsubsection*{Découverte \& Exploration}
+
+\begin{itemize}
+
+    \item \textbf{Vue Grille.}
+    Implémentée avec \texttt{LazyVerticalGrid} (3 colonnes fixes). Les posts sont chargés depuis Firestore (limite 50 documents) et mélangés aléatoirement (\texttt{shuffled()}) pour l'affichage découverte.
+
+    \item \textbf{Vue Carte.}
+    Implémentée avec le SDK \texttt{maps-compose}. Lorsqu'un post est sélectionné, ses étapes sont chargées depuis la sous-collection \texttt{/\allowbreak{}steps} et affichées avec des marqueurs bleus ; la caméra effectue une animation \texttt{newLatLngBounds} pour englober tous les points du parcours.
+
+    \item \textbf{Filtres avancés.}
+    Le modèle \texttt{PostFilter} contient un \texttt{Set<String>} de catégories et une plage de distance. Le \texttt{FilterBottomSheetContent} utilise un \texttt{RangeSlider} et des \texttt{FilterChip}. Un point indicateur s'affiche sur l'icône filtre quand \texttt{isFilterActive} est vrai.
+
+    \item \textbf{Export PDF.}
+    \texttt{PdfExporter} utilise l'API native Android \texttt{android.\allowbreak{}graphics.\allowbreak{}pdf.\allowbreak{}PdfDocument}. Les images des étapes sont téléchargées via \texttt{ImageLoader} de Coil (\texttt{allowHardware(false)}), puis dessinées sur le canvas PDF. La pagination est gérée manuellement.
+
+\end{itemize}
+
+\subsubsection*{Organisation sociale \& personnelle}
+
+\begin{itemize}
+
+    \item \textbf{Système de favoris (cache-then-network).}
+    La base Room est consultée en premier pour un affichage immédiat, puis Firestore met à jour la liste. Les IDs likés sont chargés par chunks de 30 (\texttt{whereIn} limité par Firestore). La synchronisation supprime les entrées Room obsolètes.
+
+    \item \textbf{Système de likes.}
+    Le compteur \texttt{likesCount} est mis à jour via \texttt{FieldValue.\allowbreak{}increment(±1)} dans le document post. La sous-collection \texttt{liked\_posts} de l'utilisateur est également mise à jour en parallèle.
+
+    \item \textbf{Partage interne.}
+    \texttt{SharePostDialog} fusionne et déduplique les listes d'abonnés et d'abonnements. L'envoi crée un document \texttt{FirebaseNotification} (type \texttt{SHARE\_POST}) consommé par l'écouteur temps-réel du destinataire.
+
+    \item \textbf{Partage externe.}
+    Un \texttt{Intent.\allowbreak{}ACTION\_SEND} de type \texttt{text/\allowbreak{}plain} est lancé via \texttt{Intent.\allowbreak{}createChooser}, délégant à Android le choix de l'application cible.
+
+\end{itemize}
+
+\subsubsection*{Infrastructure technique}
+
+\begin{itemize}
+
+    \item \textbf{Modèle de données Firestore.}
+    Les entités sont des \texttt{data class} Kotlin avec \texttt{@DocumentId} pour la résolution automatique de l'ID. Structure des collections : \texttt{/\allowbreak{}users}, \texttt{/\allowbreak{}travelpath\_posts} (avec sous-collection \texttt{/\allowbreak{}steps}), \texttt{/\allowbreak{}notifications}.
+
+    \item \textbf{Base de données locale Room.}
+    \texttt{TravelWowDatabase} déclare deux entités : \texttt{FavoritePost} et \texttt{LocalDraft}. Un \texttt{TypeConverter} gère la sérialisation des \texttt{List<String>} en chaîne CSV. La base est en version 4, avec \texttt{fallbackToDestructiveMigration()} activé en développement.
+    \newline\textit{Dépendances :} \texttt{androidx.\allowbreak{}room:\allowbreak{}room-runtime}, \texttt{androidx.\allowbreak{}room:\allowbreak{}room-ktx}, \texttt{androidx.\allowbreak{}room:\allowbreak{}room-compiler} (KSP).
+
+    \item \textbf{Navigation et architecture UI.}
+    \texttt{NavigationSuiteScaffold} (Material 3 Adaptive) adapte automatiquement la navigation selon la taille d'écran (barre du bas sur mobile, rail latéral sur tablette). Les états imbriqués sont gérés par des flags \texttt{Boolean} hoistés dans \texttt{TravelWowApp}, avec un \texttt{BackHandler}.
+    \newline\textit{Dépendances :} \texttt{androidx.\allowbreak{}compose.\allowbreak{}material3.\allowbreak{}adaptive:\allowbreak{}adaptive-navigation-suite}.
+
+    \item \textbf{Firebase App Check.}
+    Initialisé via \texttt{DebugAppCheckProviderFactory} dans \texttt{TravelWowApplication.\allowbreak{}onCreate()}. Le provider de debug devra être remplacé par \texttt{PlayIntegrityAppCheckProviderFactory} avant la mise en production.
+    \newline\textit{Dépendances :} \texttt{com.\allowbreak{}google.\allowbreak{}firebase:\allowbreak{}firebase-appcheck-debug}.
+
+\end{itemize}
+
+
+
+\section*{Améliorations Potentielles}
+
+
+
+\subsection*{Général}
+
+\subsubsection*{Cache hors-ligne}
+
+\begin{itemize}
+    \item Activer le cache Firestore natif via \texttt{FirebaseFirestoreSettings.\allowbreak{}Builder().\allowbreak{}setPersistenceEnabled(true)} dans \texttt{TravelWowApplication} pour conserver automatiquement les dernières données lues.
+    \item Compression et stockage local des médias associés aux contenus sauvegardés en favoris.
+\end{itemize}
+
+\subsubsection*{Sécurité \& Production}
+
+\begin{itemize}
+    \item Remplacer le \texttt{DebugAppCheckProviderFactory} par \texttt{PlayIntegrityAppCheckProviderFactory} avant la mise en production.
+    \item Mettre en place des règles de sécurité Firestore (actuellement ouvertes en mode debug).
+\end{itemize}
+
+\subsubsection*{Qualité}
+
+\begin{itemize}
+    \item Gestion explicite des erreurs réseau avec affichage de Snackbars informatifs (plusieurs blocs \texttt{catch} silencieux identifiés).
+    \item Annotations assistées par IA : intégration de l'API Google Cloud Vision ou de l'API Claude pour générer automatiquement des tags et résumés à partir des médias uploadés.
+\end{itemize}
+
+
+\subsection*{Spécifique TravelShare}
+
+\subsubsection*{Filtrage avancé du feed}
+
+\begin{itemize}
+    \item \textbf{Filtrage par période / date.} Ajouter un \texttt{DateRangePicker} (Material 3). Le champ \texttt{timestamp} existe déjà dans \texttt{TravelPhoto} ; côté Firestore, utiliser \texttt{whereGreaterThanOrEqualTo} + \texttt{whereLessThanOrEqualTo} (nécessite un index composite \texttt{timestamp} + \texttt{isPublic}).
+    \item \textbf{Filtrage par auteur.} Cliquer sur le nom d'un auteur dans le feed filtre les résultats via \texttt{whereEqualTo("authorId", uid)} — simple ajout dans \texttt{FeedViewModel}.
+    \item \textbf{Filtrage géographique.} Firestore ne supportant pas nativement les requêtes geo-radius, l'approche standard est GeoHash (bibliothèque \texttt{firebase/\allowbreak{}geofire-android}) : encoder \texttt{latitude}/\texttt{longitude} en geohash à la publication, puis requêter par plage de geohash.
+    \item \textbf{Flux aléatoire (découverte).} Ajouter un champ \texttt{randomScore:\allowbreak{} Double} à chaque document et requêter \texttt{whereGreaterThanOrEqualTo("randomScore", Random.\allowbreak{}nextDouble())} ; ou mélanger côté client via \texttt{list.\allowbreak{}shuffled()}.
+\end{itemize}
+
+\subsubsection*{Fonctionnalités vocales}
+
+\begin{itemize}
+    \item \textbf{Recherche vocale.} Intégrer \texttt{android.\allowbreak{}speech.\allowbreak{}RecognizerIntent} (ou Google Cloud Speech-to-Text) : lancer un \texttt{ActivityResultContracts} avec \texttt{RecognizerIntent.\allowbreak{}ACTION\_RECOGNIZE\_SPEECH} et injecter la chaîne transcrite dans le champ de recherche du \texttt{FeedViewModel}.
+    \item \textbf{Description vocale sur une photo.} Ajouter un bouton microphone dans \texttt{UploadScreen} via \texttt{android.\allowbreak{}media.\allowbreak{}MediaRecorder}, puis transcrire et insérer le texte dans le champ \texttt{description}.
+\end{itemize}
+
+\subsubsection*{Notifications sur abonnements thématiques}
+
+\begin{itemize}
+    \item Ajouter un sous-document \texttt{subscriptions} dans \texttt{UserProfile} (utilisateurs et tags suivis). Côté backend, une Cloud Function Firebase écoute les créations dans la collection \texttt{photos} et crée les \texttt{AppNotification} appropriées pour chaque abonné.
+\end{itemize}
+
+\subsubsection*{Photos similaires}
+
+\begin{itemize}
+    \item Utiliser Google Cloud Vision (feature \texttt{SIMILAR\_IMAGES}) ou un modèle d'embedding TensorFlow Lite pour calculer et stocker des vecteurs d'embedding à la publication, puis calculer la similarité cosinus côté client ou via une Cloud Function.
+\end{itemize}
+
+
+\subsection*{Spécifique TravelPath}
+
+\subsubsection*{Génération intelligente de parcours}
+
+\begin{itemize}
+    \item Écran dédié permettant de saisir les critères avant la génération : types d'activités, lieux obligatoires, budget, durée, niveau d'effort et tolérances météorologiques.
+    \item Intégration d'une API de génération (LLM ou service tiers) pour calculer automatiquement des parcours optimisés. Proposer au moins 2 à 3 options avec des profils distincts (« Économique », « Équilibré », « Confort »).
+    \item Prise en compte des horaires d'ouverture et des données météo du jour. Possibilité de régénérer un parcours avec des ajustements.
+    \item Affichage de l'itinéraire complet avec distances, temps de trajet, créneaux horaires suggérés et métriques globales (coût estimé, durée, niveau d'effort).
+\end{itemize}
+
+\subsubsection*{Interactions sociales à compléter}
+
+\begin{itemize}
+    \item Interface utilisateur pour la consultation et la rédaction de commentaires (le modèle \texttt{FirebaseComment} et le compteur \texttt{commentsCount} existent déjà, mais l'écran est absent).
+    \item Interface de signalement de contenu exploitant le modèle \texttt{FirebaseReport} déjà défini.
+    \item Écran de liste des notifications reçues (la collection Firestore \texttt{/\allowbreak{}notifications} est déjà alimentée).
+\end{itemize}
+
+\subsubsection*{Mode hors-ligne (TravelPath)}
+
+\begin{itemize}
+    \item Synchronisation des brouillons non synchronisés (\texttt{isSynced = false}) au retour de la connectivité, en exploitant la méthode \texttt{getUnsyncedDrafts()} déjà présente dans \texttt{DraftDao}.
+\end{itemize}
+
+\subsubsection*{Qualité \& Finitions}
+
+\begin{itemize}
+    \item Remplacement de l'icône \texttt{ic\_return} utilisée comme chevron dans \texttt{SettingsNavigationItem} par une icône dédiée.
+    \item Ajout d'une valeur réelle pour \texttt{durationMinutes} lors de la création d'un parcours (actuellement fixé à \texttt{0}).
+\end{itemize}
+
+
+
+\end{justify}
+\end{document}
