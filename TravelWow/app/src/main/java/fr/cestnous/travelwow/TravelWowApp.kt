@@ -140,6 +140,7 @@ fun TravelWowApp(
                     if (appMode == AppMode.PATH && isPathEligible) {
                         ParcoursScreen(
                             user = user,
+                            title = if (currentDestination == MainDestination.Favorites) "Mes Favoris" else "TravelWow",
                             onLogout = onLogout,
                             onBackToShare = { appMode = AppMode.SHARE },
                             showFavoritesOnly = currentDestination == MainDestination.Favorites
