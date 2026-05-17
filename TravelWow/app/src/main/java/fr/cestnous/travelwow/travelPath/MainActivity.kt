@@ -1,5 +1,13 @@
 package fr.cestnous.travelwow.travelPath
 
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,7 +19,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
-import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 class MainActivity : ComponentActivity() {
 

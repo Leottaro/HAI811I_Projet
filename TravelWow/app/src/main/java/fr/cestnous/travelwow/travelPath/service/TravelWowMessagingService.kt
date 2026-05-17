@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.service
+
+import fr.cestnous.travelwow.*
+import fr.cestnous.travelwow.travelPath.*
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,7 +21,6 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import fr.cestnous.travelwow.R
 
 class TravelWowMessagingService : FirebaseMessagingService() {
 
