@@ -245,7 +245,8 @@ fun TravelWowApp(
                                 } else {
                                     ShareProfile(
                                         onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) },
-                                        onSettingsClick = { subScreen = SubScreen.Settings }
+                                        onSettingsClick = { subScreen = SubScreen.Settings },
+                                        onPostClick = { subScreen = SubScreen.PostDetail(it) } // Added
                                     )
                                 }
                             }

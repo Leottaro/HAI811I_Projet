@@ -54,57 +54,44 @@ fun ChatListScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item { Text("Groupes", style = MaterialTheme.typography.titleMedium) }
+            item { Text("Groupes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
             items(groups) { group ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onGroupChatClick(group) }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                ListItem(
+                    headlineContent = { Text(group.name, fontWeight = FontWeight.Bold) },
+                    leadingContent = {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(group.name.take(1).uppercase())
                         }
-                        Spacer(Modifier.width(16.dp))
-                        Text(group.name, fontWeight = FontWeight.Bold)
-                    }
-                }
+                    },
+                    modifier = Modifier.clickable { onGroupChatClick(group) }
+                )
             }
 
             item { Spacer(Modifier.height(16.dp)) }
-            item { Text("Discussions individuelles", style = MaterialTheme.typography.titleMedium) }
+            item { Text("Discussions", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
             items(friends) { friend ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onChatClick(friend) }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                ListItem(
+                    headlineContent = { Text(friend.username, fontWeight = FontWeight.Bold) },
+                    leadingContent = {
                         if (friend.profileImageUrl != null) {
                             AsyncImage(
                                 model = friend.profileImageUrl,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.secondaryContainer),
                                 contentAlignment = Alignment.Center
@@ -112,10 +99,9 @@ fun ChatListScreen(
                                 Text(friend.username.take(1).uppercase())
                             }
                         }
-                        Spacer(Modifier.width(16.dp))
-                        Text(friend.username, fontWeight = FontWeight.Bold)
-                    }
-                }
+                    },
+                    modifier = Modifier.clickable { onChatClick(friend) }
+                )
             }
         }
     }

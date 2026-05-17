@@ -12,10 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,18 +25,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
+import fr.cestnous.travelwow.travelPath.data.FirebasePost
+import fr.cestnous.travelwow.travelPath.data.GalleryViewMode
+import fr.cestnous.travelwow.travelPath.ui.PostsGallery
 import fr.cestnous.travelwow.travelShare.data.model.TravelPhoto
 
 @Composable
 fun ProfileScreen(
     onPhotoClick: (TravelPhoto) -> Unit,
-    onSettingsClick: () -> Unit, // Paramètre ajouté
+    onSettingsClick: () -> Unit,
+    onPostClick: (FirebasePost) -> Unit = {},
     viewModel: ProfileViewModel = viewModel()
 ) {
     val profile by viewModel.profile.collectAsState()
     val userPhotos by viewModel.userPhotos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
+    val currentUser = FirebaseAuth.getInstance().currentUser
 
     LaunchedEffect(Unit) {
         viewModel.loadProfile()
@@ -48,6 +51,7 @@ fun ProfileScreen(
     var username by remember(profile) { mutableStateOf(profile?.username ?: "") }
     var bio by remember(profile) { mutableStateOf(profile?.bio ?: "") }
     var isEditing by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -93,14 +97,13 @@ fun ProfileScreen(
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
-            // HEADER STYLE INSTAGRAM
+            // HEADER
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Photo de profil à gauche
                 Box(
                     modifier = Modifier
                         .size(90.dp)
@@ -131,7 +134,6 @@ fun ProfileScreen(
 
                 Spacer(Modifier.width(24.dp))
 
-                // Infos et bouton edit à droite
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -140,7 +142,7 @@ fun ProfileScreen(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = onSettingsClick) { // BOUTON PARAMÈTRES
+                        IconButton(onClick = onSettingsClick) {
                             Icon(Icons.Default.Settings, contentDescription = "Paramètres", modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = { isEditing = true }) {
@@ -161,36 +163,52 @@ fun ProfileScreen(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Photos") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Parcours") }
+                )
+            }
 
-            // SECTION MES PUBLICATIONS
-            Text(
-                text = "Mes publications",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
-            if (userPhotos.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                    Text("Aucune publication pour le moment", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.fillMaxSize().weight(1f),
-                    contentPadding = PaddingValues(1.dp),
-                    horizontalArrangement = Arrangement.spacedBy(1.dp),
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
-                ) {
-                    items(userPhotos) { photo ->
-                        AsyncImage(
-                            model = photo.imageUrls.firstOrNull(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .clickable { onPhotoClick(photo) },
-                            contentScale = ContentScale.Crop
+            Box(modifier = Modifier.weight(1f)) {
+                if (selectedTab == 0) {
+                    if (userPhotos.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Aucune photo pour le moment", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(1.dp),
+                            horizontalArrangement = Arrangement.spacedBy(1.dp),
+                            verticalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            items(userPhotos) { photo ->
+                                AsyncImage(
+                                    model = photo.imageUrls.firstOrNull(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clickable { onPhotoClick(photo) },
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    if (currentUser != null) {
+                        PostsGallery(
+                            onPostClick = onPostClick,
+                            viewMode = GalleryViewMode.GRID,
+                            userIdFilter = currentUser.uid,
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
@@ -234,7 +252,7 @@ fun EditProfileDialog(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Pseudo") },
+                    label = { Text("Nom d'utilisateur") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
@@ -242,8 +260,7 @@ fun EditProfileDialog(
                     value = bio,
                     onValueChange = { bio = it },
                     label = { Text("Bio") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },

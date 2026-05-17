@@ -135,20 +135,16 @@ fun MessageBubble(
 
     LaunchedEffect(message.photoId) {
         if (message.photoId != null) {
-            // First check photos
             val photos = photoRepository.getPublicPhotos()
             sharedPhoto = photos.find { it.id == message.photoId }
             
-            // If not found in photos, check travelpath_posts
             if (sharedPhoto == null) {
                 try {
                     val snapshot = db.collection("travelpath_posts").document(message.photoId).get().await()
                     if (snapshot.exists()) {
                         sharedPost = snapshot.toObject(FirebasePost::class.java)
                     }
-                } catch (e: Exception) {
-                    // Silently fail or log
-                }
+                } catch (e: Exception) {}
             }
         }
     }
@@ -170,62 +166,53 @@ fun MessageBubble(
                 bottomEnd = if (isMe) 2.dp else 16.dp
             )
         ) {
-            val padding = if (message.photoId != null) 4.dp else 12.dp
-            Column(modifier = Modifier.padding(padding)) {
-                // Photo Preview
+            Column(modifier = Modifier.padding(12.dp)) {
                 sharedPhoto?.let { photo ->
                     Card(
                         modifier = Modifier
                             .width(200.dp)
-                            .padding(bottom = if (message.message.isNotBlank()) 4.dp else 0.dp)
+                            .padding(bottom = if (message.message.isNotBlank()) 8.dp else 0.dp)
                             .clickable { onPhotoClick(photo) },
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                     ) {
                         Column {
                             AsyncImage(
                                 model = photo.imageUrls.firstOrNull(),
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(12.dp)),
+                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             Text(
                                 photo.locationName,
                                 style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(4.dp),
-                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                modifier = Modifier.padding(8.dp),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
                 }
 
-                // Route (Post) Preview
                 sharedPost?.let { post ->
                     Card(
                         modifier = Modifier
                             .width(200.dp)
-                            .padding(bottom = if (message.message.isNotBlank()) 4.dp else 0.dp)
+                            .padding(bottom = if (message.message.isNotBlank()) 8.dp else 0.dp)
                             .clickable { onPostClick(post) },
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                     ) {
                         Column {
                             AsyncImage(
                                 model = post.mainImageUrl,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(12.dp)),
+                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             Text(
                                 post.title,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                post.locationName,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                color = (if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.7f)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
