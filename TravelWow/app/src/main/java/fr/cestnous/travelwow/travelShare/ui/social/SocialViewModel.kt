@@ -43,8 +43,13 @@ class SocialViewModel(
     fun loadDiscoverUsers() {
         viewModelScope.launch {
             _isLoading.value = true
-            // On récupère les utilisateurs récents (limité à 20 pour la démo)
-            _searchResults.value = userRepository.searchUsers("") 
+            val currentUid = auth.currentUser?.uid
+            val allUsers = userRepository.searchUsers("")
+            val friendIds = _friends.value.map { it.uid }.toSet()
+            
+            _searchResults.value = allUsers.filter { 
+                it.uid != currentUid && !friendIds.contains(it.uid) 
+            }
             _isLoading.value = false
         }
     }
@@ -56,7 +61,13 @@ class SocialViewModel(
         }
         viewModelScope.launch {
             _isLoading.value = true
-            _searchResults.value = userRepository.searchUsers(query)
+            val currentUid = auth.currentUser?.uid
+            val allResults = userRepository.searchUsers(query)
+            val friendIds = _friends.value.map { it.uid }.toSet()
+            
+            _searchResults.value = allResults.filter { 
+                it.uid != currentUid && !friendIds.contains(it.uid) 
+            }
             _isLoading.value = false
         }
     }
@@ -77,6 +88,9 @@ class SocialViewModel(
                 userRepository.getUserProfile(friendId)?.let { friendList.add(it) }
             }
             _friends.value = friendList
+            
+            // Re-filtrer les suggestions après avoir chargé les amis
+            loadDiscoverUsers()
         }
     }
 
