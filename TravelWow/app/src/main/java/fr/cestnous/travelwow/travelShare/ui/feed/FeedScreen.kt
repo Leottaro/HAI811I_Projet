@@ -129,9 +129,8 @@ fun FeedScreen(
 
     if (showFilterSheet) {
         ModalBottomSheet(onDismissRequest = { showFilterSheet = false }) {
-            // CORRECTION ICI : Ajout de 'location' dans les paramètres reçus
             FilterBottomSheetContent(
-                onApply = { type, author, start, end, radius, sort, location ->
+                onUpdate = { type, author, start, end, radius, sort, location ->
                     viewModel.applyFilters(
                         type = if (type == "Tous") null else type,
                         authorName = if (author.isBlank()) null else author,
@@ -139,11 +138,11 @@ fun FeedScreen(
                         endDate = end,
                         radius = radius?.toDoubleOrNull(),
                         sortOrder = sort,
-                        targetLat = location?.first,  // On passe la latitude
-                        targetLon = location?.second  // On passe la longitude
+                        targetLat = location?.first,
+                        targetLon = location?.second
                     )
-                    showFilterSheet = false
-                }
+                },
+                onDismiss = { showFilterSheet = false }
             )
         }
     }
@@ -152,7 +151,8 @@ fun FeedScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FilterBottomSheetContent(
-    onApply: (String, String, Long?, Long?, String, SortOrder, Pair<Double, Double>?) -> Unit
+    onUpdate: (String, String, Long?, Long?, String, SortOrder, Pair<Double, Double>?) -> Unit,
+    onDismiss: () -> Unit
 ) {
     var selectedType by remember { mutableStateOf("Tous") }
     var authorName by remember { mutableStateOf("") }
@@ -169,6 +169,10 @@ fun FilterBottomSheetContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Trigger update automatically on changes without closing
+    LaunchedEffect(selectedType, authorName, selectedSort, radius, startDate, endDate, selectedLocation) {
+        onUpdate(selectedType, authorName, startDate, endDate, radius, selectedSort, selectedLocation)
+    }
 
     Column(modifier = Modifier
         .padding(16.dp)
@@ -237,7 +241,7 @@ fun FilterBottomSheetContent(
             }
         }
 
-        // Appels des fonctions de dialogue (voir étape suivante)
+        // Appels des fonctions de dialogue
         if (showStartDatePicker) {
             MyDatePickerDialog(
                 onDateSelected = { startDate = it },
@@ -260,17 +264,12 @@ fun FilterBottomSheetContent(
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
                 IconButton(onClick = {
-                    scope.launch(Dispatchers.IO) { // CORRECTION : Utilisation de scope
+                    scope.launch(Dispatchers.IO) {
                         try {
-                            // Utilisation du Geocoder standard d'Android
                             val geocoder = Geocoder(context, Locale.getDefault())
-
-                            // Récupère une liste d'adresses (maximum 1 résultat pour l'efficacité)
                             val addresses = geocoder.getFromLocationName(locationQuery, 1)
-
                             if (!addresses.isNullOrEmpty()) {
                                 val address = addresses[0]
-                                // On met à jour l'UI sur le thread principal
                                 withContext(Dispatchers.Main) {
                                     selectedLocation = Pair(address.latitude, address.longitude)
                                 }
@@ -295,9 +294,9 @@ fun FilterBottomSheetContent(
 
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = { onApply(selectedType, authorName, startDate, endDate, radius, selectedSort, selectedLocation) },
+            onClick = onDismiss,
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Appliquer les filtres") }
+        ) { Text("Appliquer") }
         Spacer(Modifier.height(32.dp))
     }
 }
