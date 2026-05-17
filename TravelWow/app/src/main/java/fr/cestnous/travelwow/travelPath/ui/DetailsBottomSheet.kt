@@ -70,6 +70,7 @@ fun DetailsSheetContent(
     var selectedUserId by remember { mutableStateOf<String?>(null) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -270,6 +271,14 @@ fun DetailsSheetContent(
             postAuthorId = post.authorId,
             postTitle = post.title,
             onDismiss = { showCommentDialog = false },
+            currentUserProfile = currentUserProfile
+        )
+    }
+
+    if (showShareDialog && post != null) {
+        SharePostDialog(
+            post = post,
+            onDismiss = { showShareDialog = false },
             currentUserProfile = currentUserProfile
         )
     }
@@ -847,6 +856,18 @@ fun DetailsSheetContent(
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
+                        }
+
+                        IconButton(
+                            onClick = { showShareDialog = true },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Partager",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
 
                         if (isAuthor) {

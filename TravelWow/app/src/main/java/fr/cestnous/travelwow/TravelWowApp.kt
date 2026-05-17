@@ -15,9 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import fr.cestnous.travelwow.travelPath.data.FirebasePost
 import fr.cestnous.travelwow.travelPath.ParcoursScreen
+import fr.cestnous.travelwow.travelPath.ui.DetailsSheetContent
 import fr.cestnous.travelwow.travelShare.ui.feed.FeedScreen
 import fr.cestnous.travelwow.travelShare.ui.favorites.FavoritesScreen as ShareFavorites
 import fr.cestnous.travelwow.travelShare.ui.chat.ChatListScreen
@@ -56,6 +59,7 @@ sealed class SubScreen {
     data class GroupChat(val group: ChatGroup) : SubScreen()
     data object PhotoMap : SubScreen()
     data object Settings : SubScreen()
+    data class PostDetail(val post: FirebasePost) : SubScreen() // Added for routes
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,14 +126,16 @@ fun TravelWowApp(
                     targetName = (subScreen as SubScreen.Chat).user.username,
                     isGroup = false,
                     onBack = { subScreen = SubScreen.None },
-                    onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) }
+                    onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) },
+                    onPostClick = { subScreen = SubScreen.PostDetail(it) } // Handled route click
                 )
                 is SubScreen.GroupChat -> ChatScreen(
                     targetId = (subScreen as SubScreen.GroupChat).group.id,
                     targetName = (subScreen as SubScreen.GroupChat).group.name,
                     isGroup = true,
                     onBack = { subScreen = SubScreen.None },
-                    onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) }
+                    onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) },
+                    onPostClick = { subScreen = SubScreen.PostDetail(it) } // Handled route click
                 )
                 SubScreen.PhotoMap -> Scaffold(
                     topBar = {
@@ -151,6 +157,14 @@ fun TravelWowApp(
                     }
                 }
                 SubScreen.Settings -> ShareSettings(onBack = { subScreen = SubScreen.None })
+                is SubScreen.PostDetail -> {
+                    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Expanded)
+                    DetailsSheetContent(
+                        post = (subScreen as SubScreen.PostDetail).post,
+                        onDismissRequest = { subScreen = SubScreen.None },
+                        sheetState = sheetState
+                    )
+                }
                 SubScreen.None -> {
                     val isPathEligible = currentDestination == MainDestination.Feed || 
                                        currentDestination == MainDestination.Favorites
@@ -159,6 +173,7 @@ fun TravelWowApp(
                         ParcoursScreen(
                             user = user,
                             isFavoriteTab = currentDestination == MainDestination.Favorites,
+                            onLogout = onLogout,
                             onBackToShare = { appMode = AppMode.SHARE }
                         )
                     } else {
@@ -166,10 +181,10 @@ fun TravelWowApp(
                             MainDestination.Feed -> Scaffold(
                                 topBar = {
                                     CenterAlignedTopAppBar(
-                                        title = { Text("TravelWow") },
+                                        title = { Text("TravelWow", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                                         navigationIcon = {
                                             IconButton(onClick = { appMode = AppMode.PATH }) {
-                                                Icon(Icons.Default.Route, contentDescription = "Mode Parcours")
+                                                Icon(Icons.Default.Explore, contentDescription = "Mode Parcours", tint = MaterialTheme.colorScheme.primary)
                                             }
                                         },
                                         actions = {
@@ -177,7 +192,7 @@ fun TravelWowApp(
                                                 Icon(Icons.Default.Map, "Carte")
                                             }
                                             IconButton(onClick = onLogout) {
-                                                Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion")
+                                                Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion", tint = MaterialTheme.colorScheme.error)
                                             }
                                         }
                                     )
@@ -197,15 +212,15 @@ fun TravelWowApp(
                             MainDestination.Favorites -> Scaffold(
                                 topBar = {
                                     CenterAlignedTopAppBar(
-                                        title = { Text("Mes Favoris") },
+                                        title = { Text("Mes Favoris", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                                         navigationIcon = {
                                             IconButton(onClick = { appMode = AppMode.PATH }) {
-                                                Icon(Icons.Default.Route, contentDescription = "Mode Parcours")
+                                                Icon(Icons.Default.Explore, contentDescription = "Mode Parcours", tint = MaterialTheme.colorScheme.primary)
                                             }
                                         },
                                         actions = {
                                             IconButton(onClick = onLogout) {
-                                                Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion")
+                                                Icon(Icons.AutoMirrored.Filled.ExitToApp, "Déconnexion", tint = MaterialTheme.colorScheme.error)
                                             }
                                         }
                                     )
@@ -217,9 +232,13 @@ fun TravelWowApp(
                             }
                             MainDestination.Messages -> ChatListScreen(
                                 onChatClick = { subScreen = SubScreen.Chat(it) },
-                                onGroupChatClick = { subScreen = SubScreen.GroupChat(it) }
+                                onGroupChatClick = { subScreen = SubScreen.GroupChat(it) },
+                                onPostClick = { subScreen = SubScreen.PostDetail(it) } // Added
                             )
-                            MainDestination.Social -> SocialScreen(onChatClick = { subScreen = SubScreen.Chat(it) })
+                            MainDestination.Social -> SocialScreen(
+                                onChatClick = { subScreen = SubScreen.Chat(it) },
+                                onPostClick = { subScreen = SubScreen.PostDetail(it) } // Added
+                            )
                             MainDestination.Profile -> {
                                 if (isAnonymous) {
                                     PlaceholderScreen("Connectez-vous pour voir votre profil")

@@ -171,15 +171,18 @@ object PdfExporter {
         // Save file
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "TravelWow_${post.title.replace(" ", "_")}_$timeStamp.pdf"
-        val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-        val file = File(directory, fileName)
+        
+        // Save to internal app files to be sure it works without external permissions
+        // Then use FileProvider to share it
+        val file = File(context.filesDir, fileName)
 
         try {
             pdfDocument.writeTo(FileOutputStream(file))
             pdfDocument.close()
+            Log.d("PdfExporter", "PDF successfully written to ${file.absolutePath}")
             return file
         } catch (e: Exception) {
-            Log.e("PdfExporter", "Error writing PDF", e)
+            Log.e("PdfExporter", "Error writing PDF to ${file.absolutePath}", e)
             pdfDocument.close()
             return null
         }

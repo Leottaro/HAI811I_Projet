@@ -16,10 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import fr.cestnous.travelwow.travelPath.data.FirebasePost
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.tasks.await
 import fr.cestnous.travelwow.travelShare.data.model.ChatMessage
 import fr.cestnous.travelwow.travelShare.data.model.TravelPhoto
 import fr.cestnous.travelwow.travelShare.data.repository.PhotoRepository
@@ -32,6 +37,7 @@ fun ChatScreen(
     isGroup: Boolean,
     onBack: () -> Unit,
     onPhotoClick: (TravelPhoto) -> Unit,
+    onPostClick: (FirebasePost) -> Unit = {},
     viewModel: ChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
@@ -106,7 +112,8 @@ fun ChatScreen(
                     message = message,
                     isMe = message.senderId == currentUserId,
                     showSenderName = isGroup,
-                    onPhotoClick = onPhotoClick
+                    onPhotoClick = onPhotoClick,
+                    onPostClick = onPostClick
                 )
             }
         }
@@ -118,15 +125,31 @@ fun MessageBubble(
     message: ChatMessage,
     isMe: Boolean,
     showSenderName: Boolean,
-    onPhotoClick: (TravelPhoto) -> Unit
+    onPhotoClick: (TravelPhoto) -> Unit,
+    onPostClick: (FirebasePost) -> Unit
 ) {
     val photoRepository = remember { PhotoRepository() }
+    val db = remember { Firebase.firestore }
     var sharedPhoto by remember { mutableStateOf<TravelPhoto?>(null) }
+    var sharedPost by remember { mutableStateOf<FirebasePost?>(null) }
 
     LaunchedEffect(message.photoId) {
         if (message.photoId != null) {
+            // First check photos
             val photos = photoRepository.getPublicPhotos()
             sharedPhoto = photos.find { it.id == message.photoId }
+            
+            // If not found in photos, check travelpath_posts
+            if (sharedPhoto == null) {
+                try {
+                    val snapshot = db.collection("travelpath_posts").document(message.photoId).get().await()
+                    if (snapshot.exists()) {
+                        sharedPost = snapshot.toObject(FirebasePost::class.java)
+                    }
+                } catch (e: Exception) {
+                    // Silently fail or log
+                }
+            }
         }
     }
 
@@ -147,7 +170,9 @@ fun MessageBubble(
                 bottomEnd = if (isMe) 2.dp else 16.dp
             )
         ) {
-            Column(modifier = Modifier.padding(if (message.photoId != null) 4.dp else 12.dp)) {
+            val padding = if (message.photoId != null) 4.dp else 12.dp
+            Column(modifier = Modifier.padding(padding)) {
+                // Photo Preview
                 sharedPhoto?.let { photo ->
                     Card(
                         modifier = Modifier
@@ -168,6 +193,39 @@ fun MessageBubble(
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(4.dp),
                                 color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Route (Post) Preview
+                sharedPost?.let { post ->
+                    Card(
+                        modifier = Modifier
+                            .width(200.dp)
+                            .padding(bottom = if (message.message.isNotBlank()) 4.dp else 0.dp)
+                            .clickable { onPostClick(post) },
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    ) {
+                        Column {
+                            AsyncImage(
+                                model = post.mainImageUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(
+                                post.title,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                post.locationName,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                color = (if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.7f)
                             )
                         }
                     }

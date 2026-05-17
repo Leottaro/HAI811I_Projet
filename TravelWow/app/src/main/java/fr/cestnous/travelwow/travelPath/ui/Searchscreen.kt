@@ -15,7 +15,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,9 +39,6 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SearchTopBar(
     modifier: Modifier = Modifier,
-    searchQuery: String = "",
-    onSearchQueryChange: (String) -> Unit = {},
-    onAddClick: () -> Unit,
     isAdding: Boolean = false,
     isAddingStep: Boolean = false,
     onBackStepClick: () -> Unit = {},
@@ -48,145 +53,63 @@ fun SearchTopBar(
     onDeselect: () -> Unit = {},
     onFilterClick: () -> Unit = {},
     isFilterActive: Boolean = false,
-    onBackToShare: () -> Unit = {}
+    onBackToShare: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.background,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.statusBarsPadding()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                text = if (isAddingStep) "Ajouter une étape" 
+                       else if (isAdding) "Nouveau parcours"
+                       else "TravelWow",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = {
+                    if (isAddingStep) onBackStepClick()
+                    else if (isAdding) onResetPost()
+                    else if (isPostSelected) onDeselect()
+                    else onBackToShare()
+                }
             ) {
-                // "+" / "Cancel" / "Back" / "Return" Button
-                IconButton(
-                    onClick = {
-                        if (isAddingStep) onBackStepClick()
-                        else if (isAdding) onResetPost()
-                        else if (isPostSelected) onDeselect()
-                        else onAddClick()
-                    },
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                ) {
+                Icon(
+                    imageVector = if (isAddingStep || isAdding || isPostSelected) Icons.AutoMirrored.Filled.ArrowBack
+                                 else Icons.Default.Collections, // Changed from Home to Collections/Gallery
+                    contentDescription = "Retour",
+                    tint = if (isAddingStep || isAdding || isPostSelected) MaterialTheme.colorScheme.onSurface 
+                           else MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        actions = {
+            if (isAddingStep) {
+                TextButton(onClick = onConfirmStepClick, enabled = canConfirmStep) {
+                    Text("Ajouter", fontWeight = FontWeight.Bold)
+                }
+            } else if (isAdding) {
+                TextButton(onClick = onShareClick, enabled = canShare) {
+                    Text("Partager", fontWeight = FontWeight.Bold)
+                }
+            } else if (!isPostSelected) {
+                IconButton(onClick = {
+                    val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                    onViewModeChange(newMode)
+                }) {
                     Icon(
-                        painter = painterResource(
-                            if (isAddingStep || isAdding || isPostSelected) R.drawable.ic_return
-                            else R.drawable.ic_add
-                        ),
-                        contentDescription = if (isAddingStep || isAdding || isPostSelected) "Retour" else "Ajouter",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        imageVector = if (viewMode == GalleryViewMode.GRID) Icons.Default.Map else Icons.Default.ViewModule,
+                        contentDescription = "Changer de vue"
                     )
                 }
-
-                if (!isAdding && !isAddingStep) {
-                    // Search TextField
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        placeholder = {
-                            Text(
-                                text = "Recherche",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        leadingIcon = {
-                             IconButton(onClick = onBackToShare) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_home), // Or any icon representing "Home/Share"
-                                    contentDescription = "Retour à TravelShare",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        },
-                        trailingIcon = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = {
-                                    val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
-                                    onViewModeChange(newMode)
-                                }) {
-                                    Icon(
-                                        painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
-                                        contentDescription = "Changer de vue",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(onClick = onFilterClick) {
-                                    Box {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_filters),
-                                            contentDescription = "Filtres",
-                                            tint = if (isFilterActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (isFilterActive) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                                    .align(Alignment.TopEnd)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                    )
-                } else {
-                    // Title
-                    Text(
-                        text = if (isAddingStep) "Ajouter une étape" else "Nouveau parcours",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    if (isAddingStep) {
-                        // Add Step Button
-                        TextButton(
-                            onClick = onConfirmStepClick,
-                            enabled = canConfirmStep
-                        ) {
-                            Text(
-                                "Ajouter",
-                                fontWeight = FontWeight.Bold,
-                                color = if (canConfirmStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    } else {
-                        // Share Button
-                        TextButton(
-                            onClick = onShareClick,
-                            enabled = canShare
-                        ) {
-                            Text(
-                                "Partager",
-                                fontWeight = FontWeight.Bold,
-                                color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    }
+                IconButton(onClick = onLogout) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Déconnexion", tint = MaterialTheme.colorScheme.error)
                 }
             }
-        }
-    }
+        },
+        modifier = modifier
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -316,6 +239,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     excludeUserId: String? = null,
     searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {}, // Added callback
     filter: PostFilter = PostFilter(),
     onFilterChange: (PostFilter) -> Unit = {},
     showFilterSheet: Boolean = false,
@@ -328,6 +252,39 @@ fun SearchScreen(
     val sheetState = rememberModalBottomSheetState()
     
     Column(modifier = modifier.fillMaxSize()) {
+        if (viewMode == GalleryViewMode.GRID && !showFilterSheet) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Rechercher un parcours...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = { onShowFilterSheetChange(true) }) {
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = "Filtres",
+                        tint = if (filter.selectedCategories.isNotEmpty() || filter.minDistance > 0f || filter.maxDistance < 100f) 
+                               MaterialTheme.colorScheme.primary 
+                               else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
         PostsGallery(
             onPostClick = onPostClick,
             viewMode = viewMode,
@@ -364,9 +321,6 @@ fun SearchScreenPreview() {
     TravelWowTheme {
         Column {
             SearchTopBar(
-                searchQuery = "",
-                onSearchQueryChange = {},
-                onAddClick = {},
                 viewMode = GalleryViewMode.GRID,
                 onViewModeChange = {})
             SearchScreen(onPostClick = {}, viewMode = GalleryViewMode.GRID)

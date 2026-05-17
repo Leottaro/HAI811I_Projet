@@ -9,6 +9,7 @@ import fr.cestnous.travelwow.travelPath.ui.theme.*
 import fr.cestnous.travelwow.travelPath.util.*
 
 import android.content.Intent
+import android.widget.Toast
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,11 +30,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.firestore
+import fr.cestnous.travelwow.travelShare.data.model.UserProfile
+import fr.cestnous.travelwow.travelShare.data.repository.ChatRepository
+import fr.cestnous.travelwow.travelShare.ui.social.ChatListViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -41,65 +47,20 @@ import kotlinx.coroutines.tasks.await
 fun SharePostDialog(
     post: FirebasePost,
     onDismiss: () -> Unit,
-    currentUserProfile: FirebaseUser? = null
+    currentUserProfile: FirebaseUser? = null,
+    viewModel: ChatListViewModel = viewModel()
 ) {
     val db = remember { Firebase.firestore }
     val auth = remember { Firebase.auth }
     val currentUser = auth.currentUser
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val chatRepository = remember { ChatRepository() }
 
-    var followers by remember { mutableStateOf<List<FirebaseUser>>(emptyList()) }
-    var following by remember { mutableStateOf<List<FirebaseUser>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val friends by viewModel.friends.collectAsState()
+    val groups by viewModel.groups.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
-
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser != null) {
-            try {
-                // Fetch following IDs
-                val followingIds = db.collection("users")
-                    .document(currentUser.uid)
-                    .collection("following")
-                    .get()
-                    .await()
-                    .documents.map { it.id }
-
-                // Fetch follower IDs
-                val followerIds = db.collection("users")
-                    .document(currentUser.uid)
-                    .collection("followers")
-                    .get()
-                    .await()
-                    .documents.map { it.id }
-
-                val allUserIds = (followingIds + followerIds).distinct()
-
-                if (allUserIds.isNotEmpty()) {
-                    // Fetch profile details for these IDs in chunks
-                    val profiles = mutableListOf<FirebaseUser>()
-                    allUserIds.chunked(10).forEach { chunk ->
-                        val snapshot = db.collection("users")
-                            .whereIn(FieldPath.documentId(), chunk)
-                            .get()
-                            .await()
-                        profiles.addAll(snapshot.toObjects(FirebaseUser::class.java))
-                    }
-                    
-                    following = profiles.filter { followingIds.contains(it.id) }
-                    followers = profiles.filter { followerIds.contains(it.id) }
-                }
-            } catch (e: Exception) {
-                Log.e("SharePostDialog", "Error fetching connections", e)
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    val filteredList = (following + followers).distinctBy { it.id }.filter {
-        it.username.contains(searchQuery, ignoreCase = true) || it.email.contains(searchQuery, ignoreCase = true)
-    }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -113,10 +74,19 @@ fun SharePostDialog(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Text("Partager ce parcours", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                        Text("Amis", modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                        Text("Groupes", modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Rechercher un ami...") },
+                    placeholder = { Text("Rechercher...") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -126,65 +96,85 @@ fun SharePostDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                Button(
-                    onClick = {
-                        val sendIntent: Intent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, "Regarde ce parcours sur TravelWow : ${post.title}\n${post.description ?: ""}")
-                            type = "text/plain"
-                        }
-                        val shareIntent = Intent.createChooser(sendIntent, null)
-                        context.startActivity(shareIntent)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(painterResource(R.drawable.ic_switch), contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Partager à l'extérieur")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (isLoading) {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else if (filteredList.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        Text("Aucun ami trouvé", color = MaterialTheme.colorScheme.outline)
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(filteredList) { user ->
-                            UserShareItem(
-                                user = user,
-                                onShare = {
-                                    coroutineScope.launch {
-                                        try {
-                                            val senderName = currentUserProfile?.username ?: currentUser?.displayName ?: "Un voyageur"
-                                            val notification = FirebaseNotification(
-                                                recipientId = user.id,
-                                                senderId = currentUser?.uid ?: "",
-                                                senderName = senderName,
-                                                senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser?.photoUrl?.toString(),
-                                                type = NotificationType.SHARE_POST,
-                                                targetId = post.id,
-                                                title = "Nouveau parcours partagé !",
-                                                message = "$senderName vous a partagé le parcours \"${post.title}\"."
-                                            )
-                                            db.collection("notifications").add(notification)
-                                            onDismiss()
-                                        } catch (e: Exception) {
-                                            Log.e("SharePostDialog", "Error sharing post", e)
+                if (selectedTab == 0) {
+                    val filteredFriends = friends.filter { it.username.contains(searchQuery, ignoreCase = true) }
+                    if (filteredFriends.isEmpty()) {
+                        Text("Aucun ami trouvé", modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+                    } else {
+                        LazyColumn {
+                            items(filteredFriends) { friend ->
+                                UserShareItem(
+                                    name = friend.username,
+                                    imageUrl = friend.profileImageUrl,
+                                    onShare = {
+                                        coroutineScope.launch {
+                                            if (currentUser != null) {
+                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: currentUser.email ?: "Moi"
+                                                val result = chatRepository.sendMessage(
+                                                    senderId = currentUser.uid,
+                                                    senderName = senderName,
+                                                    receiverId = friend.uid,
+                                                    text = "Regarde ce parcours : ${post.title} !",
+                                                    photoId = post.id // Using photoId field for post sharing too
+                                                )
+                                                if (result.isSuccess) {
+                                                    // Also add a notification for the Path system
+                                                    val notification = FirebaseNotification(
+                                                        recipientId = friend.uid,
+                                                        senderId = currentUser.uid,
+                                                        senderName = senderName,
+                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                        type = NotificationType.SHARE_POST,
+                                                        targetId = post.id,
+                                                        title = "Nouveau parcours partagé !",
+                                                        message = "$senderName vous a partagé le parcours \"${post.title}\"."
+                                                    )
+                                                    db.collection("notifications").add(notification)
+                                                    
+                                                    Toast.makeText(context, "Partagé avec ${friend.username}", Toast.LENGTH_SHORT).show()
+                                                    onDismiss()
+                                                } else {
+                                                    Toast.makeText(context, "Erreur lors de l'envoi", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val filteredGroups = groups.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                    if (filteredGroups.isEmpty()) {
+                        Text("Aucun groupe trouvé", modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+                    } else {
+                        LazyColumn {
+                            items(filteredGroups) { group ->
+                                UserShareItem(
+                                    name = group.name,
+                                    imageUrl = null,
+                                    onShare = {
+                                        coroutineScope.launch {
+                                            if (currentUser != null) {
+                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: currentUser.email ?: "Moi"
+                                                val result = chatRepository.sendGroupMessage(
+                                                    groupId = group.id,
+                                                    senderId = currentUser.uid,
+                                                    senderName = senderName,
+                                                    text = "Regarde ce parcours : ${post.title} !",
+                                                    photoId = post.id
+                                                )
+                                                if (result.isSuccess) {
+                                                    Toast.makeText(context, "Partagé dans ${group.name}", Toast.LENGTH_SHORT).show()
+                                                    onDismiss()
+                                                } else {
+                                                    Toast.makeText(context, "Erreur lors de l'envoi", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -195,7 +185,7 @@ fun SharePostDialog(
 }
 
 @Composable
-fun UserShareItem(user: FirebaseUser, onShare: () -> Unit) {
+fun UserShareItem(name: String, imageUrl: String?, onShare: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,9 +193,9 @@ fun UserShareItem(user: FirebaseUser, onShare: () -> Unit) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (user.photoUrl != null) {
+        if (imageUrl != null) {
             AsyncImage(
-                model = user.photoUrl,
+                model = imageUrl,
                 contentDescription = null,
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Crop
@@ -215,14 +205,11 @@ fun UserShareItem(user: FirebaseUser, onShare: () -> Unit) {
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Text(user.username.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(name.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(user.username, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(user.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-        }
+        Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         TextButton(onClick = onShare) {
             Text("Envoyer")
         }

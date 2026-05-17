@@ -3,12 +3,22 @@ package fr.cestnous.travelwow.travelPath
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.Firebase
@@ -28,6 +38,7 @@ import kotlin.math.roundToInt
 fun ParcoursScreen(
     user: AuthUser,
     isFavoriteTab: Boolean = false,
+    onLogout: () -> Unit,
     onBackToShare: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -59,7 +70,6 @@ fun ParcoursScreen(
     
     var postFilter by remember { mutableStateOf(PostFilter()) }
     var showFilterSheet by remember { mutableStateOf(false) }
-    val isFilterActive = postFilter.selectedCategories.isNotEmpty() || postFilter.minDistance > 0f || postFilter.maxDistance < 100f
 
     var showCreatePost by remember { mutableStateOf(false) }
     var showAddStep by remember { mutableStateOf(false) }
@@ -109,26 +119,37 @@ fun ParcoursScreen(
         },
         topBar = {
             if (isFavoriteTab) {
-                TopAppBar(
-                    title = { Text("Favoris Parcours") },
+                CenterAlignedTopAppBar(
+                    title = { Text("Favoris Parcours", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onBackToShare) {
-                            Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
+                            Icon(
+                                imageVector = Icons.Default.Collections,
+                                contentDescription = "Retour",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     },
                     actions = {
                         IconButton(onClick = {
                             galleryViewMode = if (galleryViewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
                         }) {
-                            Icon(painterResource(if (galleryViewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel), contentDescription = "Vue")
+                            Icon(
+                                imageVector = if (galleryViewMode == GalleryViewMode.GRID) Icons.Default.Map else Icons.Default.ViewModule,
+                                contentDescription = "Vue"
+                            )
+                        }
+                        IconButton(onClick = onLogout) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Déconnexion",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 )
             } else {
                 SearchTopBar(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    onAddClick = { showCreatePost = true },
                     isAdding = showCreatePost,
                     isAddingStep = showAddStep,
                     onBackStepClick = { showAddStep = false },
@@ -188,14 +209,15 @@ fun ParcoursScreen(
                     isPostSelected = showBottomSheet,
                     onDeselect = closeBottomSheet,
                     onResetPost = { showCreatePost = false; postTitle = ""; postSteps = emptyList() },
-                    onFilterClick = { showFilterSheet = true },
-                    isFilterActive = isFilterActive,
-                    onBackToShare = onBackToShare // Pass the callback
+                    onBackToShare = onBackToShare,
+                    onLogout = onLogout
                 )
             }
-        },
-        content = { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // Content
+            Box {
                 if (showAddStep) {
                     AddStepScreen(
                         stepName = currentStepName, onStepNameChange = { currentStepName = it },
@@ -226,7 +248,10 @@ fun ParcoursScreen(
                 } else {
                     SearchScreen(
                         onPostClick = { post -> selectedPost = post; focusedPostForMap = post; showBottomSheet = true },
-                        viewMode = galleryViewMode, searchQuery = searchQuery, filter = postFilter,
+                        viewMode = galleryViewMode, 
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        filter = postFilter,
                         onFilterChange = { postFilter = it }, showFilterSheet = showFilterSheet,
                         onShowFilterSheetChange = { showFilterSheet = it },
                         focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
@@ -235,8 +260,20 @@ fun ParcoursScreen(
                     )
                 }
             }
+
+            // FAB inside Box since BottomSheetScaffold in M3 doesn't have floatingActionButton parameter
+            if (!isFavoriteTab && !showCreatePost && !showAddStep) {
+                FloatingActionButton(
+                    onClick = { showCreatePost = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Publier")
+                }
+            }
         }
-    )
+    }
 
     if (showPostSuccessDialog) {
         AlertDialog(onDismissRequest = { showPostSuccessDialog = false }, confirmButton = { TextButton(onClick = { showPostSuccessDialog = false }) { Text("OK") } }, title = { Text("Succès") }, text = { Text("Votre parcours a été publié !") })

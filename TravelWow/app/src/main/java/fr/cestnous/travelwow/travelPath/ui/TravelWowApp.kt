@@ -291,9 +291,6 @@ fun TravelWowApp(
                         when (currentDestination) {
                         AppDestinations.HOME -> SearchTopBar(
                             modifier = Modifier,
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { searchQuery = it },
-                            onAddClick = { showCreatePost = true },
                             onResetPost = {
                                 // Reset and close
                                 showCreatePost = false
@@ -463,7 +460,8 @@ fun TravelWowApp(
                             isPostSelected = showBottomSheet,
                             onDeselect = closeBottomSheet,
                             onFilterClick = { showFilterSheet = true },
-                            isFilterActive = isFilterActive
+                            isFilterActive = isFilterActive,
+                            onLogout = onLogout
                         )
                         AppDestinations.FAVORITES -> TopAppBar(
                             title = { Text(currentDestination.label) },

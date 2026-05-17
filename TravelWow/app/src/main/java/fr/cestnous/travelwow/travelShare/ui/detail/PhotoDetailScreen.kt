@@ -70,11 +70,19 @@ fun PhotoDetailScreen(
     val pagerState = rememberPagerState(pageCount = { photo.imageUrls.size })
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(photo.id) {
         repository.getCommentsFlow(photo.id).collectLatest {
             comments = it
         }
+    }
+
+    if (showShareDialog) {
+        SharePhotoDialog(
+            photo = photo,
+            onDismiss = { showShareDialog = false }
+        )
     }
 
     if (showDeleteDialog) {
@@ -140,7 +148,7 @@ fun PhotoDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onShare(photo) }) {
+                    IconButton(onClick = { showShareDialog = true }) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Partager")
                     }
                     if (isAuthor) {
