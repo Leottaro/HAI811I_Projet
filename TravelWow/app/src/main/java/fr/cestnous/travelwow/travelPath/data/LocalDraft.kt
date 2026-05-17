@@ -1,11 +1,16 @@
-package fr.cestnous.travelwow.travelPath.data.local
+package fr.cestnous.travelwow.travelPath.data
+
+import fr.cestnous.travelwow.*
+import fr.cestnous.travelwow.travelPath.*
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import androidx.room.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import fr.cestnous.travelwow.travelPath.ui.screen.FirebaseDraft
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
-import fr.cestnous.travelwow.travelPath.ui.screen.TravelStep
 
 @Entity(tableName = "drafts")
 data class LocalDraft(

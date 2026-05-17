@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath.ui.screen
+package fr.cestnous.travelwow.travelPath.ui
+
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -27,11 +35,6 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
-import fr.cestnous.travelwow.R
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseComment
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseNotification
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseUser
-import fr.cestnous.travelwow.travelPath.data.model.NotificationType
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -210,8 +213,7 @@ fun CommentDialog(
                                             coroutineScope.launch {
                                                 try {
                                                     val authorDoc = db.collection("users").document(postAuthorId).get().await()
-                                                    val authorProfile = authorDoc.toObject(
-                                                        FirebaseUser::class.java)
+                                                    val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                     
                                                     if (authorProfile?.settings?.commentsNotifications == true) {
                                                         val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
@@ -219,8 +221,7 @@ fun CommentDialog(
                                                             recipientId = postAuthorId,
                                                             senderId = currentUser.uid,
                                                             senderName = senderName,
-                                                            senderPhotoUrl = currentUserProfile?.photoUrl
-                                                                ?: currentUser.photoUrl?.toString(),
+                                                            senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
                                                             type = NotificationType.COMMENT,
                                                             targetId = postId,
                                                             title = "Nouveau commentaire !",

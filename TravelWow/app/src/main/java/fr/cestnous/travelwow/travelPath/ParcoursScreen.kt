@@ -3,149 +3,242 @@ package fr.cestnous.travelwow.travelPath
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseUser as AuthUser
 import com.google.firebase.firestore.firestore
-import fr.cestnous.travelwow.travelPath.data.model.PostFilter
-import fr.cestnous.travelwow.travelPath.GalleryViewMode
-import fr.cestnous.travelwow.travelPath.data.local.TravelWowDatabase
-import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.travelPath.data.*
 import fr.cestnous.travelwow.travelPath.ui.*
-import fr.cestnous.travelwow.travelPath.ui.screen.AddStepScreen
-import fr.cestnous.travelwow.travelPath.ui.screen.CreatePostContent
-import fr.cestnous.travelwow.travelPath.ui.screen.TravelStep
+import fr.cestnous.travelwow.travelPath.util.calculateTotalDistance
+import fr.cestnous.travelwow.travelPath.util.uploadToCloudinary
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParcoursScreen(
     user: AuthUser,
-    title: String,
-    onLogout: () -> Unit,
-    onBackToShare: () -> Unit,
-    modifier: Modifier = Modifier,
-    showFavoritesOnly: Boolean = false
+    isFavoriteTab: Boolean = false,
+    onBackToShare: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val db = remember { Firebase.firestore }
     val localDb = remember { TravelWowDatabase.getDatabase(context) }
+    val draftDao = remember { localDb.draftDao() }
 
+    var userProfile by remember { mutableStateOf<FirebaseUser?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    // Load user profile
+    LaunchedEffect(user.uid) {
+        try {
+            db.collection("users").document(user.uid).get().await().let { snapshot ->
+                if (snapshot.exists()) {
+                    userProfile = snapshot.toObject(FirebaseUser::class.java)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ParcoursScreen", "Error loading profile", e)
+        }
+    }
+
+    var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
+    var focusedPostForMap by remember { mutableStateOf<FirebasePost?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+    var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
+    
+    var postFilter by remember { mutableStateOf(PostFilter()) }
+    var showFilterSheet by remember { mutableStateOf(false) }
+    val isFilterActive = postFilter.selectedCategories.isNotEmpty() || postFilter.minDistance > 0f || postFilter.maxDistance < 100f
+
     var showCreatePost by remember { mutableStateOf(false) }
     var showAddStep by remember { mutableStateOf(false) }
     var postTitle by remember { mutableStateOf("") }
-    var postLocation by remember { mutableStateOf("") }
     var postDescription by remember { mutableStateOf("") }
     var postSteps by remember { mutableStateOf(emptyList<TravelStep>()) }
     var isSavingPost by remember { mutableStateOf(false) }
-    var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
-    var postFilter by remember { mutableStateOf(PostFilter()) }
+    var showPostSuccessDialog by remember { mutableStateOf(false) }
 
-    // État pour AddStepScreen
+    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
+    val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
+    
+    val closeBottomSheet = {
+        showBottomSheet = false
+        coroutineScope.launch {
+            try { sheetState.partialExpand() } catch (e: Exception) {}
+            selectedPost = null
+            focusedPostForMap = null
+        }
+        Unit
+    }
+
+    BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep) {
+        if (showAddStep) showAddStep = false
+        else if (showCreatePost) showCreatePost = false
+        else if (showBottomSheet) closeBottomSheet()
+    }
+
+    // State for AddStepScreen
     var currentStepName by remember { mutableStateOf("") }
     var currentStepCategory by remember { mutableStateOf("") }
     var currentStepImages by remember { mutableStateOf(emptyList<String>()) }
     var currentStepLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
 
-    var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
-    var showBottomSheet by remember { mutableStateOf(false) }
-
-    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
-
-    BackHandler(enabled = showCreatePost || showAddStep || showBottomSheet) {
-        if (showAddStep) showAddStep = false
-        else if (showCreatePost) showCreatePost = false
-        else if (showBottomSheet) showBottomSheet = false
-    }
-
-    Scaffold(
-        topBar = {
-            SearchTopBar(
-                title = title,
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onResetPost = { showCreatePost = false },
-                isAdding = showCreatePost,
-                isAddingStep = showAddStep,
-                onBackStepClick = { showAddStep = false },
-                onConfirmStepClick = {
-                    postSteps = postSteps + TravelStep(
-                        name = currentStepName.ifBlank { "Étape sans nom" },
-                        category = currentStepCategory,
-                        latitude = currentStepLocation.latitude,
-                        longitude = currentStepLocation.longitude,
-                        images = currentStepImages
-                    )
-                    showAddStep = false
-                    currentStepName = ""; currentStepCategory = ""; currentStepImages = emptyList()
-                },
-                canConfirmStep = currentStepName.isNotBlank(),
-                canShare = postTitle.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost,
-                onShareClick = { /* Logique de partage */ },
-                onFilterClick = { /* ... */ },
-                isFilterActive = false,
-                viewMode = galleryViewMode,
-                onViewModeChange = { galleryViewMode = it },
-                isPostSelected = showBottomSheet,
-                onDeselect = { showBottomSheet = false },
-                onSwitchClick = onBackToShare,
-                onLogout = onLogout
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = if (showBottomSheet) 140.dp else 0.dp,
+        sheetDragHandle = { if (showBottomSheet) BottomSheetDefaults.DragHandle() },
+        sheetSwipeEnabled = showBottomSheet,
+        sheetContent = {
+            DetailsSheetContent(
+                post = selectedPost,
+                onDismissRequest = closeBottomSheet,
+                sheetState = sheetState,
+                currentUserProfile = userProfile
             )
         },
-        floatingActionButton = {
-            if (!showCreatePost && !showAddStep && !showBottomSheet && !showFavoritesOnly) {
-                FloatingActionButton(onClick = { showCreatePost = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Créer un parcours")
+        topBar = {
+            if (isFavoriteTab) {
+                TopAppBar(
+                    title = { Text("Favoris Parcours") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackToShare) {
+                            Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            galleryViewMode = if (galleryViewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                        }) {
+                            Icon(painterResource(if (galleryViewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel), contentDescription = "Vue")
+                        }
+                    }
+                )
+            } else {
+                SearchTopBar(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    onAddClick = { showCreatePost = true },
+                    isAdding = showCreatePost,
+                    isAddingStep = showAddStep,
+                    onBackStepClick = { showAddStep = false },
+                    onConfirmStepClick = {
+                        postSteps = postSteps + TravelStep(
+                            name = currentStepName.ifBlank { "Étape sans nom" },
+                            category = currentStepCategory,
+                            latitude = currentStepLocation.latitude,
+                            longitude = currentStepLocation.longitude,
+                            images = currentStepImages
+                        )
+                        showAddStep = false
+                        currentStepName = ""; currentStepCategory = ""; currentStepImages = emptyList()
+                    },
+                    canConfirmStep = currentStepName.isNotBlank(),
+                    canShare = postTitle.isNotBlank() && postSteps.isNotEmpty() && !isSavingPost,
+                    onShareClick = {
+                        isSavingPost = true
+                        coroutineScope.launch {
+                            try {
+                                val firebaseSteps = postSteps.mapIndexed { index, step ->
+                                    val stepImageUrls = step.images.map { uri ->
+                                        if (uri.startsWith("content://") || uri.startsWith("file://")) uploadToCloudinary(uri, context) else uri
+                                    }
+                                    FirebaseStep(
+                                        id = step.id, name = step.name, category = step.category,
+                                        latitude = step.latitude, longitude = step.longitude,
+                                        imageUrls = stepImageUrls, order = index
+                                    )
+                                }
+                                val postRef = db.collection("travelpath_posts").document()
+                                val totalDistance = calculateTotalDistance(postSteps)
+                                val post = FirebasePost(
+                                    id = postRef.id, authorId = user.uid, title = postTitle,
+                                    locationName = firebaseSteps.firstOrNull()?.name ?: "",
+                                    description = postDescription,
+                                    mainImageUrl = firebaseSteps.flatMap { it.imageUrls }.firstOrNull(),
+                                    latitude = firebaseSteps.firstOrNull()?.latitude ?: 0.0,
+                                    longitude = firebaseSteps.firstOrNull()?.longitude ?: 0.0,
+                                    distanceKm = (totalDistance * 10).roundToInt() / 10.0,
+                                    steps = firebaseSteps,
+                                    categories = firebaseSteps.map { it.category }.filter { it.isNotBlank() }.distinct()
+                                )
+                                postRef.set(post).await()
+                                showPostSuccessDialog = true
+                                showCreatePost = false
+                                postTitle = ""; postDescription = ""; postSteps = emptyList()
+                            } catch (e: Exception) {
+                                Log.e("ParcoursScreen", "Error sharing post", e)
+                            } finally {
+                                isSavingPost = false
+                            }
+                        }
+                    },
+                    viewMode = galleryViewMode,
+                    onViewModeChange = { galleryViewMode = it },
+                    isPostSelected = showBottomSheet,
+                    onDeselect = closeBottomSheet,
+                    onResetPost = { showCreatePost = false; postTitle = ""; postSteps = emptyList() },
+                    onFilterClick = { showFilterSheet = true },
+                    isFilterActive = isFilterActive,
+                    onBackToShare = onBackToShare // Pass the callback
+                )
+            }
+        },
+        content = { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
+                if (showAddStep) {
+                    AddStepScreen(
+                        stepName = currentStepName, onStepNameChange = { currentStepName = it },
+                        stepCategory = currentStepCategory, onStepCategoryChange = { currentStepCategory = it },
+                        stepImages = currentStepImages, onStepImagesChange = { currentStepImages = it },
+                        onLocationSelected = { currentStepLocation = it },
+                        lastStepLocation = postSteps.lastOrNull()?.let { LatLng(it.latitude, it.longitude) }
+                    )
+                } else if (showCreatePost) {
+                    CreatePostContent(
+                        title = postTitle, onTitleChange = { postTitle = it },
+                        location = "", onLocationChange = {}, // Added missing parameter
+                        description = postDescription, onDescriptionChange = { postDescription = it },
+                        steps = postSteps, onAddStepClick = { showAddStep = true },
+                        onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
+                        onStepsChange = { postSteps = it },
+                        onSaveDraft = { /* Logic for draft if needed */ },
+                        isSaving = false
+                    )
+                } else if (isFavoriteTab) {
+                    PostsGallery(
+                        onPostClick = { post -> selectedPost = post; focusedPostForMap = post; showBottomSheet = true },
+                        viewMode = galleryViewMode, favoritesUserId = user.uid,
+                        focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
+                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                        onEmptySpaceClick = closeBottomSheet
+                    )
+                } else {
+                    SearchScreen(
+                        onPostClick = { post -> selectedPost = post; focusedPostForMap = post; showBottomSheet = true },
+                        viewMode = galleryViewMode, searchQuery = searchQuery, filter = postFilter,
+                        onFilterChange = { postFilter = it }, showFilterSheet = showFilterSheet,
+                        onShowFilterSheetChange = { showFilterSheet = it },
+                        focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
+                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                        onEmptySpaceClick = closeBottomSheet
+                    )
                 }
             }
         }
-    ) { padding ->
-        Box(modifier = modifier.padding(padding)) {
-            if (showAddStep) {
-                AddStepScreen(
-                    stepName = currentStepName,
-                    onStepNameChange = { currentStepName = it },
-                    stepCategory = currentStepCategory,
-                    onStepCategoryChange = { currentStepCategory = it },
-                    stepImages = currentStepImages,
-                    onStepImagesChange = { currentStepImages = it },
-                    onLocationSelected = { currentStepLocation = it },
-                    lastStepLocation = postSteps.lastOrNull()?.let { LatLng(it.latitude, it.longitude) }
-                )
-            } else if (showCreatePost) {
-                CreatePostContent(
-                    title = postTitle,
-                    onTitleChange = { postTitle = it },
-                    location = postLocation,
-                    onLocationChange = { postLocation = it },
-                    description = postDescription,
-                    onDescriptionChange = { postDescription = it },
-                    steps = postSteps,
-                    onAddStepClick = { showAddStep = true },
-                    onRemoveStep = { step -> postSteps = postSteps.filter { it.id != step.id } },
-                    onStepsChange = { postSteps = it },
-                    onSaveDraft = { /* ... */ },
-                    isSaving = false
-                )
-            } else {
-                SearchScreen(
-                    onPostClick = { selectedPost = it; showBottomSheet = true },
-                    viewMode = galleryViewMode,
-                    searchQuery = searchQuery,
-                    excludeUserId = if (showFavoritesOnly) null else user.uid,
-                    favoritesUserId = if (showFavoritesOnly) user.uid else null,
-                    filter = postFilter,
-                    onFilterChange = { postFilter = it }
-                )
-            }
-        }
+    )
+
+    if (showPostSuccessDialog) {
+        AlertDialog(onDismissRequest = { showPostSuccessDialog = false }, confirmButton = { TextButton(onClick = { showPostSuccessDialog = false }) { Text("OK") } }, title = { Text("Succès") }, text = { Text("Votre parcours a été publié !") })
     }
 }

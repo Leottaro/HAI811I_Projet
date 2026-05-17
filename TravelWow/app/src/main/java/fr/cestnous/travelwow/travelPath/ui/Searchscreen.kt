@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui
+
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -7,32 +15,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import fr.cestnous.travelwow.R
-import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
-import fr.cestnous.travelwow.travelPath.data.model.PostFilter
-import fr.cestnous.travelwow.travelPath.ui.theme.TravelWowTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchTopBar(
     modifier: Modifier = Modifier,
-    title: String = "TravelWow",
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
+    onAddClick: () -> Unit,
     isAdding: Boolean = false,
     isAddingStep: Boolean = false,
     onBackStepClick: () -> Unit = {},
@@ -47,110 +48,145 @@ fun SearchTopBar(
     onDeselect: () -> Unit = {},
     onFilterClick: () -> Unit = {},
     isFilterActive: Boolean = false,
-    onSwitchClick: (() -> Unit)? = null,
-    onLogout: (() -> Unit)? = null
+    onBackToShare: () -> Unit = {}
 ) {
-    var isSearchActive by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(isAdding, isAddingStep, isPostSelected) {
-        if (isAdding || isAddingStep || isPostSelected) isSearchActive = false
-    }
-
-    CenterAlignedTopAppBar(
-        title = {
-            if (isAdding || isAddingStep) {
-                Text(if (isAddingStep) "Ajouter une étape" else "Nouveau parcours")
-            } else if (isSearchActive) {
-                TextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = { Text("Recherche...", style = MaterialTheme.typography.bodyLarge) },
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                Text(title)
-            }
-        },
-        navigationIcon = {
-            if (isAdding || isAddingStep || isPostSelected) {
-                IconButton(onClick = {
-                    if (isAddingStep) onBackStepClick()
-                    else if (isAdding) onResetPost()
-                    else if (isPostSelected) onDeselect()
-                }) {
-                    Icon(painterResource(R.drawable.ic_return), contentDescription = "Retour")
-                }
-            } else if (isSearchActive) {
-                IconButton(onClick = { isSearchActive = false; onSearchQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = "Fermer")
-                }
-            } else if (onSwitchClick != null) {
-                IconButton(onClick = onSwitchClick) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.statusBarsPadding()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // "+" / "Cancel" / "Back" / "Return" Button
+                IconButton(
+                    onClick = {
+                        if (isAddingStep) onBackStepClick()
+                        else if (isAdding) onResetPost()
+                        else if (isPostSelected) onDeselect()
+                        else onAddClick()
+                    },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                ) {
                     Icon(
-                        imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = "Vers TravelShare"
+                        painter = painterResource(
+                            if (isAddingStep || isAdding || isPostSelected) R.drawable.ic_return
+                            else R.drawable.ic_add
+                        ),
+                        contentDescription = if (isAddingStep || isAdding || isPostSelected) "Retour" else "Ajouter",
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
-            }
-        },
-        actions = {
-            if (isAdding || isAddingStep) {
-                if (isAddingStep) {
-                    TextButton(onClick = onConfirmStepClick, enabled = canConfirmStep) {
-                        Text("Ajouter", fontWeight = FontWeight.Bold)
-                    }
+
+                if (!isAdding && !isAddingStep) {
+                    // Search TextField
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                text = "Recherche",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        leadingIcon = {
+                             IconButton(onClick = onBackToShare) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_home), // Or any icon representing "Home/Share"
+                                    contentDescription = "Retour à TravelShare",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
+                                    onViewModeChange(newMode)
+                                }) {
+                                    Icon(
+                                        painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
+                                        contentDescription = "Changer de vue",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = onFilterClick) {
+                                    Box {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_filters),
+                                            contentDescription = "Filtres",
+                                            tint = if (isFilterActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (isFilterActive) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                                    .align(Alignment.TopEnd)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                    )
                 } else {
-                    TextButton(onClick = onShareClick, enabled = canShare) {
-                        Text("Partager", fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else if (!isPostSelected) {
-                if (!isSearchActive) {
-                    IconButton(onClick = { isSearchActive = true }) {
-                        Icon(Icons.Default.Search, contentDescription = "Rechercher")
-                    }
-                }
-                
-                IconButton(onClick = {
-                    val newMode = if (viewMode == GalleryViewMode.GRID) GalleryViewMode.MAP else GalleryViewMode.GRID
-                    onViewModeChange(newMode)
-                }) {
-                    Icon(
-                        painter = painterResource(if (viewMode == GalleryViewMode.GRID) R.drawable.ic_map else R.drawable.ic_panel),
-                        contentDescription = "Vue"
+                    // Title
+                    Text(
+                        text = if (isAddingStep) "Ajouter une étape" else "Nouveau parcours",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
                     )
-                }
-                
-                IconButton(onClick = onFilterClick) {
-                    Box {
-                        Icon(painterResource(R.drawable.ic_filters), contentDescription = "Filtres")
-                        if (isFilterActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                    .align(Alignment.TopEnd)
+                    
+                    if (isAddingStep) {
+                        // Add Step Button
+                        TextButton(
+                            onClick = onConfirmStepClick,
+                            enabled = canConfirmStep
+                        ) {
+                            Text(
+                                "Ajouter",
+                                fontWeight = FontWeight.Bold,
+                                color = if (canConfirmStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else {
+                        // Share Button
+                        TextButton(
+                            onClick = onShareClick,
+                            enabled = canShare
+                        ) {
+                            Text(
+                                "Partager",
+                                fontWeight = FontWeight.Bold,
+                                color = if (canShare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             )
                         }
                     }
                 }
-
-                if (onLogout != null && !isSearchActive) {
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Déconnexion")
-                    }
-                }
             }
-        },
-        modifier = modifier
-    )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -279,7 +315,6 @@ fun SearchScreen(
     viewMode: GalleryViewMode,
     modifier: Modifier = Modifier,
     excludeUserId: String? = null,
-    favoritesUserId: String? = null,
     searchQuery: String = "",
     filter: PostFilter = PostFilter(),
     onFilterChange: (PostFilter) -> Unit = {},
@@ -298,7 +333,6 @@ fun SearchScreen(
             viewMode = viewMode,
             modifier = Modifier.weight(1f),
             excludeUserId = excludeUserId,
-            favoritesUserId = favoritesUserId,
             searchQuery = searchQuery,
             filter = filter,
             focusedPost = focusedPost,
@@ -332,6 +366,7 @@ fun SearchScreenPreview() {
             SearchTopBar(
                 searchQuery = "",
                 onSearchQueryChange = {},
+                onAddClick = {},
                 viewMode = GalleryViewMode.GRID,
                 onViewModeChange = {})
             SearchScreen(onPostClick = {}, viewMode = GalleryViewMode.GRID)

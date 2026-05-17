@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.service
+
+import fr.cestnous.travelwow.*
+import fr.cestnous.travelwow.travelPath.*
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,7 +21,6 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import fr.cestnous.travelwow.R
 
 class TravelWowMessagingService : FirebaseMessagingService() {
 
@@ -37,7 +44,7 @@ class TravelWowMessagingService : FirebaseMessagingService() {
     }
 
     private fun sendNotification(title: String, messageBody: String) {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, fr.cestnous.travelwow.MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -69,7 +76,7 @@ class TravelWowMessagingService : FirebaseMessagingService() {
 
     companion object {
         fun sendLocalNotification(context: Context, title: String, messageBody: String) {
-            val intent = Intent(context, MainActivity::class.java).apply {
+            val intent = Intent(context, fr.cestnous.travelwow.MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
             val pendingIntent = PendingIntent.getActivity(

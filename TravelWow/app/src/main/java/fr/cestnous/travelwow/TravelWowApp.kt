@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.Message
 import androidx.compose.material.icons.filled.*
@@ -130,20 +131,35 @@ fun TravelWowApp(
                     onBack = { subScreen = SubScreen.None },
                     onPhotoClick = { subScreen = SubScreen.PhotoDetail(it) }
                 )
-                SubScreen.PhotoMap -> ShareMap(
-                    onBack = { subScreen = SubScreen.None },
-                    onPhotoClick = { subScreen = SubScreen.PhotoDetail(it, true) }
-                )
+                SubScreen.PhotoMap -> Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Carte des voyages") },
+                            navigationIcon = {
+                                IconButton(onClick = { subScreen = SubScreen.None }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                                }
+                            }
+                        )
+                    }
+                ) { p ->
+                    Box(modifier = Modifier.padding(p)) {
+                        ShareMap(
+                            onBack = { subScreen = SubScreen.None },
+                            onPhotoClick = { subScreen = SubScreen.PhotoDetail(it, true) }
+                        )
+                    }
+                }
                 SubScreen.Settings -> ShareSettings(onBack = { subScreen = SubScreen.None })
                 SubScreen.None -> {
-                    val isPathEligible = currentDestination == MainDestination.Feed || currentDestination == MainDestination.Favorites
+                    val isPathEligible = currentDestination == MainDestination.Feed || 
+                                       currentDestination == MainDestination.Favorites
+                    
                     if (appMode == AppMode.PATH && isPathEligible) {
                         ParcoursScreen(
                             user = user,
-                            title = if (currentDestination == MainDestination.Favorites) "Mes Favoris" else "TravelWow",
-                            onLogout = onLogout,
-                            onBackToShare = { appMode = AppMode.SHARE },
-                            showFavoritesOnly = currentDestination == MainDestination.Favorites
+                            isFavoriteTab = currentDestination == MainDestination.Favorites,
+                            onBackToShare = { appMode = AppMode.SHARE }
                         )
                     } else {
                         when (currentDestination) {

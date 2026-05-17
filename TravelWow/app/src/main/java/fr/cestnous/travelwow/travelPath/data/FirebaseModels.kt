@@ -1,4 +1,4 @@
-package fr.cestnous.travelwow.travelPath.data.model
+package fr.cestnous.travelwow.travelPath.data
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId

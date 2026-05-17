@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath
+package fr.cestnous.travelwow.travelPath.ui
+
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -39,8 +47,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import fr.cestnous.travelwow.R
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseUserSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

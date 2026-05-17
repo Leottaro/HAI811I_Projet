@@ -3,8 +3,6 @@ package fr.cestnous.travelwow.travelShare.ui.map
 import android.graphics.Color
 import android.graphics.PorterDuff
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,7 +16,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     onBack: () -> Unit,
@@ -28,55 +25,47 @@ fun MapScreen(
     val photos by viewModel.photos.collectAsState()
     val context = LocalContext.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Carte des voyages") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
+    // Important for OSMDroid: ensure configuration is loaded before use
+    LaunchedEffect(Unit) {
+        org.osmdroid.config.Configuration.getInstance().userAgentValue = context.packageName
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                MapView(ctx).apply {
+                    setTileSource(TileSourceFactory.MAPNIK)
+                    setMultiTouchControls(true)
+                    controller.setZoom(6.0)
+                    controller.setCenter(GeoPoint(46.2276, 2.2137))
                 }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    MapView(ctx).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        controller.setZoom(6.0)
-                        controller.setCenter(GeoPoint(46.2276, 2.2137))
-                    }
-                },
-                update = { mapView ->
-                    mapView.overlays.clear()
-                    photos.forEach { photo ->
-                        if (photo.latitude != null && photo.longitude != null) {
-                            val marker = Marker(mapView)
-                            marker.position = GeoPoint(photo.latitude, photo.longitude)
-                            marker.title = photo.locationName
-                            
-                            // Style du Pin : Rouge pur
-                            val icon = context.getDrawable(org.osmdroid.library.R.drawable.marker_default)?.mutate()
-                            icon?.setColorFilter(Color.RED, PorterDuff.Mode.SRC_IN)
-                            marker.icon = icon
-                            
-                            // Désactiver l'infobulle (la "main" / le texte au clic)
-                            marker.infoWindow = null 
-                            
-                            marker.setOnMarkerClickListener { _, _ ->
-                                onPhotoClick(photo)
-                                true // Consomme l'événement pour éviter l'affichage de l'infobulle
-                            }
-                            mapView.overlays.add(marker)
+            },
+            update = { mapView ->
+                mapView.overlays.clear()
+                photos.forEach { photo ->
+                    if (photo.latitude != null && photo.longitude != null) {
+                        val marker = Marker(mapView)
+                        marker.position = GeoPoint(photo.latitude, photo.longitude)
+                        marker.title = photo.locationName
+                        
+                        // Style du Pin : Rouge pur
+                        val icon = context.getDrawable(org.osmdroid.library.R.drawable.marker_default)?.mutate()
+                        icon?.setColorFilter(Color.RED, PorterDuff.Mode.SRC_IN)
+                        marker.icon = icon
+                        
+                        // Désactiver l'infobulle (la "main" / le texte au clic)
+                        marker.infoWindow = null 
+                        
+                        marker.setOnMarkerClickListener { _, _ ->
+                            onPhotoClick(photo)
+                            true // Consomme l'événement pour éviter l'affichage de l'infobulle
                         }
+                        mapView.overlays.add(marker)
                     }
-                    mapView.invalidate()
                 }
-            )
-        }
+                mapView.invalidate()
+            }
+        )
     }
 }

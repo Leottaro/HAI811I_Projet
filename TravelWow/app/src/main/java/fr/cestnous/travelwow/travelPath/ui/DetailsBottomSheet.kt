@@ -1,4 +1,12 @@
-package fr.cestnous.travelwow.travelPath.ui.screen
+package fr.cestnous.travelwow.travelPath.ui
+
+import fr.cestnous.travelwow.R
+import fr.cestnous.travelwow.BuildConfig
+import fr.cestnous.travelwow.travelPath.data.*
+import fr.cestnous.travelwow.travelPath.service.*
+import fr.cestnous.travelwow.travelPath.ui.*
+import fr.cestnous.travelwow.travelPath.ui.theme.*
+import fr.cestnous.travelwow.travelPath.util.*
 
 import android.content.Intent
 import android.util.Log
@@ -37,19 +45,6 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
-import fr.cestnous.travelwow.R
-import fr.cestnous.travelwow.travelPath.PdfExporter
-import fr.cestnous.travelwow.travelPath.UserDetailDialog
-import fr.cestnous.travelwow.travelPath.data.local.FavoritePost
-import fr.cestnous.travelwow.travelPath.data.local.TravelWowDatabase
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseComment
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseLikedPost
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseNotification
-import fr.cestnous.travelwow.travelPath.data.model.FirebasePost
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseReport
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseStep
-import fr.cestnous.travelwow.travelPath.data.model.FirebaseUser
-import fr.cestnous.travelwow.travelPath.data.model.NotificationType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -429,23 +424,20 @@ fun DetailsSheetContent(
                                                     coroutineScope.launch {
                                                         try {
                                                             val authorDoc = db.collection("users").document(post.authorId).get().await()
-                                                            val authorProfile = authorDoc.toObject(
-                                                                FirebaseUser::class.java)
+                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                             
                                                             if (authorProfile?.settings?.commentsNotifications == true) {
                                                                 val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
-                                                                val notification =
-                                                                    FirebaseNotification(
-                                                                        recipientId = post.authorId,
-                                                                        senderId = currentUser.uid,
-                                                                        senderName = senderName,
-                                                                        senderPhotoUrl = currentUserProfile?.photoUrl
-                                                                            ?: currentUser.photoUrl?.toString(),
-                                                                        type = NotificationType.COMMENT,
-                                                                        targetId = post.id,
-                                                                        title = "Nouveau commentaire !",
-                                                                        message = "$senderName a commenté votre parcours \"${post.title}\"."
-                                                                    )
+                                                                val notification = FirebaseNotification(
+                                                                    recipientId = post.authorId,
+                                                                    senderId = currentUser.uid,
+                                                                    senderName = senderName,
+                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                    type = NotificationType.COMMENT,
+                                                                    targetId = post.id,
+                                                                    title = "Nouveau commentaire !",
+                                                                    message = "$senderName a commenté votre parcours \"${post.title}\"."
+                                                                )
                                                                 db.collection("notifications").add(notification)
                                                             }
                                                         } catch (e: Exception) {
@@ -892,31 +884,27 @@ fun DetailsSheetContent(
                                                     val now = System.currentTimeMillis()
                                                     likedPostRef.set(FirebaseLikedPost(id = post.id)).await()
                                                     postRef.update("likesCount", FieldValue.increment(1)).await()
-                                                    dbLocal.favoritePostDao().insertFavorite(
-                                                        FavoritePost.fromFirebasePost(post, now))
+                                                    dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, now))
                                                     isFavorite = true
 
                                                     // Send Notification to Post Author (if not self)
                                                     if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
                                                         try {
                                                             val authorDoc = db.collection("users").document(post.authorId).get().await()
-                                                            val authorProfile = authorDoc.toObject(
-                                                                FirebaseUser::class.java)
+                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
                                                             
                                                             if (authorProfile?.settings?.likesNotifications == true) {
                                                                 val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
-                                                                val notification =
-                                                                    FirebaseNotification(
-                                                                        recipientId = post.authorId,
-                                                                        senderId = currentUser.uid,
-                                                                        senderName = senderName,
-                                                                        senderPhotoUrl = currentUserProfile?.photoUrl
-                                                                            ?: currentUser.photoUrl?.toString(),
-                                                                        type = NotificationType.LIKE,
-                                                                        targetId = post.id,
-                                                                        title = "Nouveau like !",
-                                                                        message = "$senderName a aimé votre parcours \"${post.title}\"."
-                                                                    )
+                                                                val notification = FirebaseNotification(
+                                                                    recipientId = post.authorId,
+                                                                    senderId = currentUser.uid,
+                                                                    senderName = senderName,
+                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                    type = NotificationType.LIKE,
+                                                                    targetId = post.id,
+                                                                    title = "Nouveau like !",
+                                                                    message = "$senderName a aimé votre parcours \"${post.title}\"."
+                                                                )
                                                                 db.collection("notifications").add(notification)
                                                             }
                                                         } catch (e: Exception) {
