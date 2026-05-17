@@ -43,16 +43,6 @@ import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.roundToInt
 
-@Immutable
-data class TravelStep(
-    val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val category: String = "",
-    val latitude: Double,
-    val longitude: Double,
-    val images: List<String> = emptyList()
-)
-
 @Composable
 fun CreatePostContent(
     title: String,

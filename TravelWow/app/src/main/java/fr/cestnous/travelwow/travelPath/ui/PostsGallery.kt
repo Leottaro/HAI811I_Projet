@@ -41,10 +41,6 @@ import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-enum class GalleryViewMode {
-    GRID, MAP
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostsGallery(
