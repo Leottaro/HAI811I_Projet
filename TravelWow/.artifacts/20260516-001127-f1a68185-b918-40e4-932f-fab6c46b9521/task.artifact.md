@@ -1,0 +1,5 @@
+- [x] Investigating Places API REQUEST_DENIED issue
+- [x] Creating Implementation Plan
+- [x] Improve logging in `AddStepScreen.kt`
+- [x] Implement fallback to New Places API (v1)
+- [x] Verify changes via Logcat
