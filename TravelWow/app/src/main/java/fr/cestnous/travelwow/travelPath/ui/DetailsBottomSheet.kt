@@ -493,11 +493,13 @@ fun DetailsSheetContent(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
                 ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp)
+                        contentPadding = PaddingValues(
+                            bottom = innerPadding.calculateBottomPadding() + 16.dp,
+                            top = 0.dp
+                        )
                     ) {
                         item {
                             Column(modifier = Modifier.padding(16.dp)) {

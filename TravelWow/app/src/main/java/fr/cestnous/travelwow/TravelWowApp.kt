@@ -16,6 +16,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import fr.cestnous.travelwow.travelPath.data.FirebasePost
@@ -160,10 +161,27 @@ fun TravelWowApp(
                 }
                 SubScreen.Settings -> ShareSettings(onBack = { subScreen = SubScreen.None })
                 is SubScreen.PostDetail -> {
-                    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Expanded)
+                    val sheetState = rememberStandardBottomSheetState(
+                        initialValue = SheetValue.Expanded,
+                        skipHiddenState = false
+                    )
+                    val scope = rememberCoroutineScope()
+                    
+                    // Sync subScreen with sheetState
+                    LaunchedEffect(sheetState.currentValue) {
+                        if (sheetState.currentValue == SheetValue.Hidden) {
+                            subScreen = SubScreen.None
+                        }
+                    }
+
                     DetailsSheetContent(
                         post = (subScreen as SubScreen.PostDetail).post,
-                        onDismissRequest = { subScreen = SubScreen.None },
+                        onDismissRequest = { 
+                            scope.launch {
+                                sheetState.hide()
+                                subScreen = SubScreen.None
+                            }
+                        },
                         sheetState = sheetState
                     )
                 }

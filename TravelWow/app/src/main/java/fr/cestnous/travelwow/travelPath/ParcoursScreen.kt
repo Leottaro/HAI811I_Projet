@@ -79,18 +79,33 @@ fun ParcoursScreen(
     var isSavingPost by remember { mutableStateOf(false) }
     var showPostSuccessDialog by remember { mutableStateOf(false) }
 
-    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
+    val sheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        skipHiddenState = false
+    )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
     val closeBottomSheet = {
-        showBottomSheet = false
         coroutineScope.launch {
-            try { sheetState.partialExpand() } catch (e: Exception) {}
+            try { sheetState.hide() } catch (e: Exception) {}
+            showBottomSheet = false
             selectedPost = null
             focusedPostForMap = null
         }
         Unit
     }
+
+    // Sync showBottomSheet with sheetState
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Hidden) {
+            showBottomSheet = false
+            selectedPost = null
+            focusedPostForMap = null
+        } else {
+            showBottomSheet = true
+        }
+    }
+
 
     BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep) {
         if (showAddStep) showAddStep = false
@@ -247,7 +262,13 @@ fun ParcoursScreen(
                     )
                 } else if (isFavoriteTab) {
                     PostsGallery(
-                        onPostClick = { post -> selectedPost = post; focusedPostForMap = post; showBottomSheet = true },
+                        onPostClick = { post -> 
+                    selectedPost = post
+                    focusedPostForMap = post
+                    coroutineScope.launch {
+                        sheetState.partialExpand()
+                    }
+                },
                         viewMode = galleryViewMode, favoritesUserId = user.uid,
                         focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
                         contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
@@ -255,7 +276,13 @@ fun ParcoursScreen(
                     )
                 } else {
                     SearchScreen(
-                        onPostClick = { post -> selectedPost = post; focusedPostForMap = post; showBottomSheet = true },
+                        onPostClick = { post -> 
+                    selectedPost = post
+                    focusedPostForMap = post
+                    coroutineScope.launch {
+                        sheetState.partialExpand()
+                    }
+                },
                         viewMode = galleryViewMode, 
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },

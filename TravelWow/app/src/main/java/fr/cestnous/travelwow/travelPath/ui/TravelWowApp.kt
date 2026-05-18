@@ -209,23 +209,36 @@ fun TravelWowApp(
     var currentStepLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
     
     val sheetState = rememberStandardBottomSheetState(
-        initialValue = SheetValue.PartiallyExpanded
+        initialValue = SheetValue.Hidden,
+        skipHiddenState = false
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
     val closeBottomSheet = {
-        showBottomSheet = false
         coroutineScope.launch {
             try {
-                sheetState.partialExpand()
+                sheetState.hide()
             } catch (e: Exception) {
                 Log.e("TravelWowApp", "Error closing bottom sheet", e)
             }
+            showBottomSheet = false
             selectedPost = null
             focusedPostForMap = null
         }
         Unit
     }
+
+    // Sync showBottomSheet with sheetState
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Hidden) {
+            showBottomSheet = false
+            selectedPost = null
+            focusedPostForMap = null
+        } else {
+            showBottomSheet = true
+        }
+    }
+
 
     // Automatically deselect the post when the page changes
     LaunchedEffect(currentDestination) {
@@ -668,7 +681,9 @@ fun TravelWowApp(
                                             onPostClick = { post ->
                                                 selectedPost = post
                                                 focusedPostForMap = post
-                                                showBottomSheet = true
+                                                coroutineScope.launch {
+                                                    sheetState.partialExpand()
+                                                }
                                             },
                                             viewMode = galleryViewMode,
                                             modifier = Modifier,
@@ -695,7 +710,9 @@ fun TravelWowApp(
                                         onPostClick = { post ->
                                             selectedPost = post
                                             focusedPostForMap = post
-                                            showBottomSheet = true
+                                            coroutineScope.launch {
+                                                sheetState.partialExpand()
+                                            }
                                         },
                                         viewMode = galleryViewMode,
                                         modifier = Modifier.fillMaxSize(),
@@ -749,7 +766,9 @@ fun TravelWowApp(
                                                 onPostClick = { post ->
                                                     selectedPost = post
                                                     focusedPostForMap = post
-                                                    showBottomSheet = true
+                                                    coroutineScope.launch {
+                                                        sheetState.partialExpand()
+                                                    }
                                                 },
                                                 viewMode = galleryViewMode,
                                                 modifier = Modifier.weight(1f),
