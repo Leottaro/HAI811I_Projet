@@ -73,6 +73,18 @@ class ChatRepository {
         }
     }
 
+    suspend fun addMembersToGroup(groupId: String, memberIds: List<String>): Result<Unit> {
+        return try {
+            val groupDoc = groupsCollection.document(groupId).get().await()
+            val currentMembers = groupDoc.get("members") as? List<String> ?: emptyList()
+            val newMembers = (currentMembers + memberIds).distinct()
+            groupsCollection.document(groupId).update("members", newMembers).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun getUserGroupsFlow(userId: String): Flow<List<ChatGroup>> = callbackFlow {
         val subscription = groupsCollection
             .whereArrayContains("members", userId)

@@ -139,7 +139,27 @@ fun CreateGroupDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
-                Text("Membres", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Membres", style = MaterialTheme.typography.labelLarge)
+                    if (friends.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                if (selectedMembers.size == friends.size) {
+                                    selectedMembers.clear()
+                                } else {
+                                    selectedMembers.clear()
+                                    selectedMembers.addAll(friends.map { it.uid })
+                                }
+                            }
+                        ) {
+                            Text(if (selectedMembers.size == friends.size) "Tout désélectionner" else "Tout sélectionner")
+                        }
+                    }
+                }
                 LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                     items(friends) { friend ->
                         Row(

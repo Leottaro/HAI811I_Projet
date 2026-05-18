@@ -19,9 +19,24 @@ class ChatViewModel(
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages
 
+    private val _friends = MutableStateFlow<List<String>>(emptyList())
+    val friends: StateFlow<List<String>> = _friends
+
     private val auth = FirebaseAuth.getInstance()
     private var currentChatId: String? = null
     private var isGroupChat: Boolean = false
+
+    init {
+        loadFriends()
+    }
+
+    private fun loadFriends() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            val profile = userRepository.getUserProfile(uid)
+            _friends.value = profile?.friends ?: emptyList()
+        }
+    }
 
     fun observeMessages(targetId: String, isGroup: Boolean) {
         currentChatId = targetId
@@ -60,6 +75,14 @@ class ChatViewModel(
             } else {
                 chatRepository.sendMessage(currentUserId, senderName, targetId, text, photoId)
             }
+        }
+    }
+
+    fun addAllFriendsToGroup(groupId: String) {
+        val friendIds = _friends.value
+        if (friendIds.isEmpty()) return
+        viewModelScope.launch {
+            chatRepository.addMembersToGroup(groupId, friendIds)
         }
     }
 }
