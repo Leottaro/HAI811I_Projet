@@ -40,8 +40,16 @@ class FeedViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             repository.getPhotosFlow().collectLatest {
-                allPhotosList = it
-                _photos.value = it
+                if (it.isEmpty() && auth.currentUser?.isAnonymous == true) {
+                    // Try a manual fetch as fallback for anonymous users if flow is empty
+                    // (Sometimes snapshot listeners behave differently with anonymous auth/rules)
+                    val publicPhotos = repository.getPublicPhotos()
+                    allPhotosList = publicPhotos
+                    _photos.value = publicPhotos
+                } else {
+                    allPhotosList = it
+                    _photos.value = it
+                }
                 _isLoading.value = false
             }
         }

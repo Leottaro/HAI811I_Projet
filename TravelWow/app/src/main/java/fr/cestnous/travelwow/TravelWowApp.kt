@@ -95,10 +95,12 @@ fun TravelWowApp(
     NavigationSuiteScaffold(
         navigationSuiteItems = {
             MainDestination.values().forEach { dest ->
+                val isEnabled = !isAnonymous || dest == MainDestination.Feed
                 item(
                     icon = dest.icon,
                     label = { Text(dest.label) },
                     selected = currentDestination == dest,
+                    enabled = isEnabled,
                     onClick = { 
                         currentDestination = dest
                         subScreen = SubScreen.None 

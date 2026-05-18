@@ -24,13 +24,16 @@ class PhotoRepository {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    // Gracefully close flow on error (like permission denied on logout)
+                    // Gracefully close flow on error (like permission denied on logout or anonymous)
                     Log.w("PhotoRepository", "getPhotosFlow error: ${error.message}")
+                    // If it's a permission error, we might still want to try a one-time fetch if possible
+                    // or at least notify the collector
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
                     val photos = snapshot.toObjects(TravelPhoto::class.java)
+                    Log.d("PhotoRepository", "getPhotosFlow: ${photos.size} photos received")
                     trySend(photos)
                 }
             }

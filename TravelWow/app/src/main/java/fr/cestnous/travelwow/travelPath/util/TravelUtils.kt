@@ -13,7 +13,7 @@ import kotlin.math.*
 
 suspend fun uploadToCloudinary(uri: String, context: Context): String = suspendCancellableCoroutine { continuation ->
     MediaManager.get().upload(uri.toUri())
-        .option("unsigned", true)
+        .unsigned("travelWowPreset")
         .callback(object : UploadCallback {
             override fun onStart(requestId: String) {}
             override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}

@@ -140,24 +140,28 @@ fun TravelWowApp(onLogout: () -> Unit) {
                 icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
                 label = { Text("Favoris") },
                 selected = currentScreen is Screen.Favorites,
+                enabled = !isAnonymous,
                 onClick = { currentScreen = Screen.Favorites }
             )
             item(
                 icon = { Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null) },
                 label = { Text("Messages") },
                 selected = currentScreen is Screen.Messages || currentScreen is Screen.Chat || currentScreen is Screen.GroupChat,
+                enabled = !isAnonymous,
                 onClick = { currentScreen = Screen.Messages }
             )
             item(
                 icon = { Icon(Icons.Default.People, contentDescription = null) },
                 label = { Text("Social") },
                 selected = currentScreen is Screen.Social,
+                enabled = !isAnonymous,
                 onClick = { currentScreen = Screen.Social }
             )
             item(
                 icon = { Icon(Icons.Default.Person, contentDescription = null) },
                 label = { Text("Profil") },
                 selected = currentScreen is Screen.Profile || currentScreen is Screen.Settings,
+                enabled = !isAnonymous,
                 onClick = { currentScreen = Screen.Profile }
             )
         }
