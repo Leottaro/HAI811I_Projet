@@ -533,7 +533,10 @@ fun TravelWowApp(
                                     "username" to newName,
                                     "bio" to newBio
                                 )
-                                finalPhotoUrl?.let { updates["photoUrl"] = it }
+                                finalPhotoUrl?.let { 
+                                    updates["photoUrl"] = it 
+                                    updates["profileImageUrl"] = it // Synchro travelShare
+                                }
                                 
                                 db.collection("users").document(user.uid)
                                     .set(updates, SetOptions.merge())

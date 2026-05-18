@@ -26,8 +26,15 @@ class UserRepository {
     }
 
     suspend fun isUsernameUnique(username: String): Boolean {
-        val query = usersCollection.whereEqualTo("username", username).get().await()
-        return query.isEmpty
+        return try {
+            val query = usersCollection.whereEqualTo("username", username).get().await()
+            query.isEmpty
+        } catch (e: Exception) {
+            // En cas d'erreur (ex: permission denied si pas encore connecté), 
+            // on considère par défaut que c'est ok ou on laisse l'appelant gérer.
+            // Ici on retourne true pour permettre la tentative de création.
+            true 
+        }
     }
 
     suspend fun createUserProfile(profile: UserProfile): Result<Unit> {

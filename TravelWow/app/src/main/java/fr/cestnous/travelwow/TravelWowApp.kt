@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.launch
 import com.google.firebase.auth.FirebaseAuth
@@ -96,15 +97,28 @@ fun TravelWowApp(
     NavigationSuiteScaffold(
         navigationSuiteItems = {
             MainDestination.values().forEach { dest ->
-                val isEnabled = !isAnonymous || dest == MainDestination.Feed
+                val isRestricted = isAnonymous && (dest == MainDestination.Messages || dest == MainDestination.Social || dest == MainDestination.Profile)
+                
                 item(
-                    icon = dest.icon,
-                    label = { Text(dest.label) },
+                    icon = {
+                        CompositionLocalProvider(
+                            LocalContentColor provides if (isRestricted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else LocalContentColor.current
+                        ) {
+                            dest.icon()
+                        }
+                    },
+                    label = { 
+                        Text(
+                            text = dest.label,
+                            color = if (isRestricted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                        ) 
+                    },
                     selected = currentDestination == dest,
-                    enabled = isEnabled,
                     onClick = { 
-                        currentDestination = dest
-                        subScreen = SubScreen.None 
+                        if (!isRestricted) {
+                            currentDestination = dest
+                            subScreen = SubScreen.None 
+                        }
                     }
                 )
             }

@@ -1,6 +1,7 @@
 package fr.cestnous.travelwow.travelShare
 
 import android.widget.Toast
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -102,29 +103,41 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                             }
                             
                             scope.launch {
-                                if (userRepository.isUsernameUnique(cleanUsername)) {
-                                    auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword)
-                                        .addOnCompleteListener { task ->
-                                            if (task.isSuccessful) {
-                                                val user = task.result?.user
-                                                if (user != null) {
-                                                    scope.launch {
-                                                        userRepository.createUserProfile(
-                                                            UserProfile(
-                                                                uid = user.uid,
-                                                                username = cleanUsername,
-                                                                email = cleanEmail
-                                                            )
-                                                        )
-                                                        onAuthSuccess()
+                                try {
+                                    if (userRepository.isUsernameUnique(cleanUsername)) {
+                                        auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword)
+                                            .addOnCompleteListener { task ->
+                                                if (task.isSuccessful) {
+                                                    val user = task.result?.user
+                                                    if (user != null) {
+                                                        // Important: on lance la création du profil IMMEDIATEMENT
+                                                        // avant que le listener de MainActivity ne change d'écran
+                                                        scope.launch {
+                                                            try {
+                                                                userRepository.createUserProfile(
+                                                                    UserProfile(
+                                                                        uid = user.uid,
+                                                                        username = cleanUsername,
+                                                                        email = cleanEmail
+                                                                    )
+                                                                )
+                                                                onAuthSuccess()
+                                                            } catch (e: Exception) {
+                                                                Log.e("AuthScreen", "Error creating profile", e)
+                                                                onAuthSuccess() // On continue quand même
+                                                            }
+                                                        }
                                                     }
+                                                } else {
+                                                    Toast.makeText(context, "Erreur: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                                                 }
-                                            } else {
-                                                Toast.makeText(context, "Erreur: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                                             }
-                                        }
-                                } else {
-                                    Toast.makeText(context, "Ce pseudo est déjà pris", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Ce pseudo est déjà pris", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("AuthScreen", "Registration crash", e)
+                                    Toast.makeText(context, "Une erreur est survenue", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }

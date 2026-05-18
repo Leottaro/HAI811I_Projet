@@ -14,11 +14,19 @@ data class FirebaseUser(
     val email: String = "",
     val bio: String = "",
     val photoUrl: String? = null,
+    val profileImageUrl: String? = null, // Sync with travelShare
     val fcmToken: String? = null,
     val followersCount: Int = 0,
     val followingCount: Int = 0,
+    val friends: List<String> = emptyList(), // Sync with travelShare
     val createdAt: Timestamp = Timestamp.now(),
-    val settings: FirebaseUserSettings = FirebaseUserSettings()
+    val settings: FirebaseUserSettings = FirebaseUserSettings(),
+    
+    // travelShare specific notification flags
+    val notifyMessages: Boolean = true,
+    val notifyFriendRequests: Boolean = true,
+    val notifyLikes: Boolean = true,
+    val notifyComments: Boolean = true
 )
 
 /**

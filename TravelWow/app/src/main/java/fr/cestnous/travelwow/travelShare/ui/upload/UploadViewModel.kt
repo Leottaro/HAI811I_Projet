@@ -3,6 +3,7 @@ package fr.cestnous.travelwow.travelShare.ui.upload
 import android.content.Context
 import android.location.Geocoder
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cloudinary.android.MediaManager
@@ -138,7 +139,7 @@ class UploadViewModel : ViewModel() {
                 val uid = auth.currentUser?.uid
                 val userProfile = if (uid != null) userRepository.getUserProfile(uid) else null
 
-                val photoData = mutableMapOf(
+                val photoData: MutableMap<String, Any?> = mutableMapOf(
                     "imageUrls" to imageUrls,
                     "description" to description,
                     "locationName" to locationName,
@@ -153,12 +154,16 @@ class UploadViewModel : ViewModel() {
                 if (photoId == null) {
                     // Création
                     photoData["authorId"] = uid ?: "Unknown"
-                    photoData["timestamp"] = Timestamp.Companion.now()
+                    photoData["timestamp"] = Timestamp.now()
                     photoData["likesCount"] = 0
                     db.collection("photos").add(photoData).await()
+                    Log.d("UploadViewModel", "Photo created successfully")
                 } else {
                     // Mise à jour
-                    db.collection("photos").document(photoId).update(photoData as Map<String, Any>).await()
+                    // On retire les valeurs nulles pour l'update Firestore
+                    val updateData = photoData.filterValues { it != null } as Map<String, Any>
+                    db.collection("photos").document(photoId).update(updateData).await()
+                    Log.d("UploadViewModel", "Photo updated successfully: $photoId")
                 }
 
                 _isUploading.value = false
