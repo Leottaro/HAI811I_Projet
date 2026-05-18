@@ -23,6 +23,9 @@ class SocialViewModel(
     private val _incomingRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     val incomingRequests: StateFlow<List<FriendRequest>> = _incomingRequests
 
+    private val _sentRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
+    val sentRequests: StateFlow<List<FriendRequest>> = _sentRequests
+
     private val _friends = MutableStateFlow<List<UserProfile>>(emptyList())
     val friends: StateFlow<List<UserProfile>> = _friends
 
@@ -35,6 +38,7 @@ class SocialViewModel(
         val uid = auth.currentUser?.uid
         if (uid != null) {
             observeIncomingRequests(uid)
+            observeOutgoingRequests(uid)
             loadFriends(uid)
             loadDiscoverUsers() // Charger des suggestions au démarrage
         }
@@ -76,6 +80,14 @@ class SocialViewModel(
         viewModelScope.launch {
             friendRepository.getIncomingRequestsFlow(uid).collectLatest {
                 _incomingRequests.value = it
+            }
+        }
+    }
+
+    private fun observeOutgoingRequests(uid: String) {
+        viewModelScope.launch {
+            friendRepository.getOutgoingRequestsFlow(uid).collectLatest {
+                _sentRequests.value = it
             }
         }
     }

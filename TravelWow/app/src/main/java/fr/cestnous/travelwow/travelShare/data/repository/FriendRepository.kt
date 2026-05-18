@@ -101,4 +101,21 @@ class FriendRepository {
             }
         awaitClose { subscription.remove() }
     }
+
+    fun getOutgoingRequestsFlow(userId: String): Flow<List<FriendRequest>> = callbackFlow {
+        val subscription = requestsCollection
+            .whereEqualTo("fromId", userId)
+            .whereEqualTo("status", "PENDING")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w("FriendRepository", "getOutgoingRequestsFlow error: ${error.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    trySend(snapshot.toObjects(FriendRequest::class.java))
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
 }

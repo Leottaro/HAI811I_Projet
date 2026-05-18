@@ -70,6 +70,8 @@ fun FriendsListTab(onChatClick: (UserProfile) -> Unit, viewModel: SocialViewMode
 @Composable
 fun DiscoverFriendsTab(viewModel: SocialViewModel) {
     val searchResults by viewModel.searchResults.collectAsState()
+    val incomingRequests by viewModel.incomingRequests.collectAsState()
+    val sentRequests by viewModel.sentRequests.collectAsState()
     var query by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -87,8 +89,19 @@ fun DiscoverFriendsTab(viewModel: SocialViewModel) {
         
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(searchResults) { user ->
-                UserItem(user, onAction = { viewModel.sendRequest(user) }) {
-                    Text("Ajouter")
+                val hasPendingRequest = sentRequests.any { it.toId == user.uid } || 
+                                       incomingRequests.any { it.fromId == user.uid }
+                
+                UserItem(
+                    user = user, 
+                    onAction = { viewModel.sendRequest(user) },
+                    enabled = !hasPendingRequest
+                ) {
+                    if (hasPendingRequest) {
+                        Text("Demandé")
+                    } else {
+                        Text("Ajouter")
+                    }
                 }
             }
         }
@@ -135,7 +148,12 @@ fun RequestsTab(viewModel: SocialViewModel) {
 }
 
 @Composable
-fun UserItem(user: UserProfile, onAction: () -> Unit, actionLabel: @Composable () -> Unit) {
+fun UserItem(
+    user: UserProfile, 
+    onAction: () -> Unit, 
+    enabled: Boolean = true,
+    actionLabel: @Composable () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -170,7 +188,10 @@ fun UserItem(user: UserProfile, onAction: () -> Unit, actionLabel: @Composable (
             }
         }
         
-        Button(onClick = onAction) {
+        Button(
+            onClick = onAction,
+            enabled = enabled
+        ) {
             actionLabel()
         }
     }
