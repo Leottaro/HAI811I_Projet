@@ -101,7 +101,7 @@ fun TravelWowApp(
                     val initialUsername = user.displayName?.takeIf { it.isNotBlank() }
                         ?: user.email!!.substringBefore("@")
                     val initialProfile = FirebaseUser(
-                        id = user.uid,
+                        uid = user.uid,
                         username = initialUsername,
                         email = user.email!!,
                     )

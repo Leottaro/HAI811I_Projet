@@ -9,7 +9,7 @@ import com.google.firebase.firestore.Exclude
  * Path: /users/{userId}
  */
 data class FirebaseUser(
-    @DocumentId val id: String = "",
+    val uid: String = "",
     val username: String = "",
     val email: String = "",
     val bio: String = "",

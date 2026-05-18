@@ -41,7 +41,9 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.Firebase
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
@@ -133,7 +135,41 @@ fun DetailsSheetContent(
     }
 
     var steps by remember { mutableStateOf<List<FirebaseStep>>(emptyList()) }
-    var previewComments by remember { mutableStateOf<List<FirebaseComment>>(emptyList()) }
+    var comments by remember { mutableStateOf<List<FirebaseComment>>(emptyList()) }
+    var lastCommentDoc by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    var isCommentsLoading by remember { mutableStateOf(false) }
+    var hasMoreComments by remember { mutableStateOf(true) }
+    val PAGE_SIZE = 10
+
+    val loadComments: () -> Unit = {
+        if (!isCommentsLoading && hasMoreComments && post != null) {
+            isCommentsLoading = true
+            coroutineScope.launch {
+                try {
+                    var query = db.collection("travelpath_posts").document(post.id)
+                        .collection("comments")
+                        .orderBy("createdAt", Query.Direction.DESCENDING)
+                        .limit(PAGE_SIZE.toLong())
+
+                    lastCommentDoc?.let {
+                        query = query.startAfter(it)
+                    }
+
+                    val snapshot = query.get().await()
+                    val newComments = snapshot.toObjects(FirebaseComment::class.java)
+
+                    comments = if (lastCommentDoc == null) newComments else comments + newComments
+                    lastCommentDoc = snapshot.documents.lastOrNull()
+                    hasMoreComments = newComments.size == PAGE_SIZE
+                } catch (e: Exception) {
+                    Log.e("DetailsBottomSheet", "Error loading comments", e)
+                } finally {
+                    isCommentsLoading = false
+                }
+            }
+        }
+    }
+
     var isStepsLoading by remember { mutableStateOf(false) }
 
     val allImages = remember(post, steps) {
@@ -167,22 +203,17 @@ fun DetailsSheetContent(
                 }
                 isStepsLoading = false
 
-                // Fetch a preview of comments (last 3)
-                db.collection("travelpath_posts").document(post.id)
-                    .collection("comments")
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .limit(3)
-                    .addSnapshotListener { snapshot, e ->
-                        if (snapshot != null) {
-                            previewComments = snapshot.toObjects(FirebaseComment::class.java)
-                        }
-                    }
+                // Load initial comments
+                comments = emptyList()
+                lastCommentDoc = null
+                hasMoreComments = true
+                loadComments()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         } else {
             steps = emptyList()
-            previewComments = emptyList()
+            comments = emptyList()
         }
     }
 
@@ -399,10 +430,11 @@ fun DetailsSheetContent(
                                 IconButton(
                                     onClick = {
                                         if (newCommentText.isNotBlank() && currentUser != null) {
+                                            val textToSend = newCommentText
                                             isSending = true
                                             val commentData = hashMapOf(
                                                 "authorId" to currentUser.uid,
-                                                "text" to newCommentText,
+                                                "text" to textToSend,
                                                 "likesCount" to 0,
                                                 "createdAt" to FieldValue.serverTimestamp()
                                             )
@@ -410,9 +442,20 @@ fun DetailsSheetContent(
                                             db.collection("travelpath_posts").document(post.id)
                                                 .collection("comments")
                                                 .add(commentData)
-                                                .addOnSuccessListener {
+                                                .addOnSuccessListener { docRef ->
                                                     newCommentText = ""
                                                     isSending = false
+
+                                                    // Manually add the new comment to the list for immediate UI update
+                                                    val newComment = FirebaseComment(
+                                                        id = docRef.id,
+                                                        authorId = currentUser.uid,
+                                                        text = textToSend,
+                                                        createdAt = Timestamp.now(),
+                                                        likedByUsers = emptyList()
+                                                    )
+                                                    comments = listOf(newComment) + comments
+
                                                     // Update comments count in post
                                                     db.collection("travelpath_posts").document(post.id)
                                                         .update("commentsCount", FieldValue.increment(1))
@@ -726,7 +769,7 @@ fun DetailsSheetContent(
                                 }
                             }
 
-                            items(previewComments, key = { it.id }) { comment ->
+                            items(comments, key = { it.id }) { comment ->
                                 var commentAuthor by remember { mutableStateOf<FirebaseUser?>(null) }
                                 LaunchedEffect(comment.authorId) {
                                     if (comment.authorId.isNotBlank()) {
@@ -746,30 +789,45 @@ fun DetailsSheetContent(
                                         currentUserId = currentUser?.uid,
                                         onLikeClick = {
                                             if (currentUser != null) {
+                                                val userId = currentUser.uid
                                                 val commentRef = db.collection("travelpath_posts")
                                                     .document(post.id)
                                                     .collection("comments")
                                                     .document(comment.id)
 
+                                                // Optimistic UI update
+                                                val isCurrentlyLiked = comment.likedByUsers.contains(userId)
+                                                val updatedLikedByUsers = if (isCurrentlyLiked) {
+                                                    comment.likedByUsers - userId
+                                                } else {
+                                                    comment.likedByUsers + userId
+                                                }
+                                                
+                                                comments = comments.map { 
+                                                    if (it.id == comment.id) it.copy(likedByUsers = updatedLikedByUsers) 
+                                                    else it 
+                                                }
+
                                                 coroutineScope.launch {
                                                     try {
-                                                        if (comment.likedByUsers.contains(currentUser.uid)) {
+                                                        if (isCurrentlyLiked) {
                                                             commentRef.update(
                                                                 "likedByUsers",
-                                                                FieldValue.arrayRemove(currentUser.uid)
+                                                                FieldValue.arrayRemove(userId)
                                                             ).await()
                                                         } else {
                                                             commentRef.update(
                                                                 "likedByUsers",
-                                                                FieldValue.arrayUnion(currentUser.uid)
+                                                                FieldValue.arrayUnion(userId)
                                                             ).await()
                                                         }
                                                     } catch (e: Exception) {
-                                                        Log.e(
-                                                            "DetailsBottomSheet",
-                                                            "Error liking comment",
-                                                            e
-                                                        )
+                                                        Log.e("DetailsBottomSheet", "Error liking comment", e)
+                                                        // Revert on error
+                                                        comments = comments.map { 
+                                                            if (it.id == comment.id) it.copy(likedByUsers = comment.likedByUsers) 
+                                                            else it 
+                                                        }
                                                     }
                                                 }
                                             }
@@ -788,6 +846,22 @@ fun DetailsSheetContent(
                                             showReportDialog = true
                                         }
                                     )
+                                }
+                            }
+
+                            if (hasMoreComments && comments.isNotEmpty()) {
+                                item {
+                                    LaunchedEffect(Unit) {
+                                        loadComments()
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    }
                                 }
                             }
                         }
@@ -869,21 +943,22 @@ fun DetailsSheetContent(
                                             val likedPostRef = userRef.collection("liked_posts").document(post.id)
                                             val dbLocal = TravelWowDatabase.getDatabase(context)
 
+                                            val wasFavorite = isFavorite
+                                            isFavorite = !wasFavorite
+
                                             coroutineScope.launch {
                                                 try {
-                                                    if (isFavorite) {
+                                                    if (wasFavorite) {
                                                         // Unlike
                                                         likedPostRef.delete().await()
                                                         postRef.update("likesCount", FieldValue.increment(-1)).await()
                                                         dbLocal.favoritePostDao().deleteByPostId(post.id)
-                                                        isFavorite = false
                                                     } else {
                                                         // Like
                                                         val now = System.currentTimeMillis()
                                                         likedPostRef.set(FirebaseLikedPost(id = post.id)).await()
                                                         postRef.update("likesCount", FieldValue.increment(1)).await()
                                                         dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, now))
-                                                        isFavorite = true
 
                                                         // Send Notification to Post Author (if not self)
                                                         if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
@@ -912,6 +987,7 @@ fun DetailsSheetContent(
                                                     }
                                                 } catch (e: Exception) {
                                                     Log.e("DetailsBottomSheet", "Error updating liked posts", e)
+                                                    isFavorite = wasFavorite // Revert on error
                                                 }
                                             }
                                         }
@@ -1124,22 +1200,24 @@ fun CommentItem(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onLikeClick,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .offset(x = (-8).dp) // Offset to align icon visually while having larger hit area
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onLikeClick() }
+                    .padding(8.dp) // Increased hit area
+            ) {
+                Icon(
+                    painter = painterResource(if (isLiked) R.drawable.ic_heart else R.drawable.ic_favorite),
+                    contentDescription = null,
+                    tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(if (isLiked) R.drawable.ic_heart else R.drawable.ic_favorite),
-                        contentDescription = null,
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = likesCount.toString(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
             }
