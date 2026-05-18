@@ -139,7 +139,11 @@ fun ParcoursScreen(
                                 contentDescription = "Vue"
                             )
                         }
-                        IconButton(onClick = onLogout) {
+                        IconButton(onClick = {
+                            coroutineScope.launch {
+                                onLogout()
+                            }
+                        }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                                 contentDescription = "Déconnexion",
@@ -210,7 +214,11 @@ fun ParcoursScreen(
                     onDeselect = closeBottomSheet,
                     onResetPost = { showCreatePost = false; postTitle = ""; postSteps = emptyList() },
                     onBackToShare = onBackToShare,
-                    onLogout = onLogout
+                    onLogout = {
+                        coroutineScope.launch {
+                            onLogout()
+                        }
+                    }
                 )
             }
         }

@@ -180,10 +180,15 @@ fun TravelWowApp(
             text = { Text("Voulez-vous vraiment vous déconnecter de votre compte TravelWow ? Vos données resteront synchronisées sur Firebase.") },
             confirmButton = {
                 TextButton(onClick = {
-                    showLogoutDialog = false
                     coroutineScope.launch {
-                        TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
-                        onLogout()
+                        try {
+                            TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
+                            showLogoutDialog = false
+                            onLogout()
+                        } catch (e: Exception) {
+                            Log.e("TravelWowApp", "Logout error", e)
+                            onLogout() // Fallback
+                        }
                     }
                 }) {
                     Text("Se déconnecter", color = MaterialTheme.colorScheme.error)
@@ -718,7 +723,16 @@ fun TravelWowApp(
                                             viewMode = galleryViewMode,
                                             onViewModeChange = { galleryViewMode = it },
                                             onSettingsClick = { showSettings = true },
-                                            onLogoutClick = { showLogoutDialog = true },
+                                            onLogoutClick = {
+                                                coroutineScope.launch {
+                                                    try {
+                                                        TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
+                                                        onLogout()
+                                                    } catch (e: Exception) {
+                                                        onLogout()
+                                                    }
+                                                }
+                                            },
                                             onEditProfileClick = { showEditProfile = true }
                                         )
 

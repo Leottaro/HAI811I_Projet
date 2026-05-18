@@ -2,6 +2,7 @@ package fr.cestnous.travelwow.travelShare.data.repository
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 import fr.cestnous.travelwow.travelShare.data.model.AppNotification
 import fr.cestnous.travelwow.travelShare.data.model.FriendRequest
 import fr.cestnous.travelwow.travelShare.data.model.UserProfile
@@ -88,7 +89,12 @@ class FriendRepository {
         val subscription = requestsCollection
             .whereEqualTo("toId", userId)
             .whereEqualTo("status", "PENDING")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w("FriendRepository", "getIncomingRequestsFlow error: ${error.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
                     trySend(snapshot.toObjects(FriendRequest::class.java))
                 }

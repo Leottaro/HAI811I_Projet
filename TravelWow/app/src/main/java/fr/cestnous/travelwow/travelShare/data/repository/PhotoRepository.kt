@@ -24,7 +24,9 @@ class PhotoRepository {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    // Gracefully close flow on error (like permission denied on logout)
+                    Log.w("PhotoRepository", "getPhotosFlow error: ${error.message}")
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -40,7 +42,8 @@ class PhotoRepository {
             .whereEqualTo("authorId", userId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    Log.w("PhotoRepository", "getUserPhotosFlow error: ${error.message}")
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {

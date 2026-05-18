@@ -37,12 +37,24 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             TravelWowTheme {
-                val auth = FirebaseAuth.getInstance()
+                val auth = remember { FirebaseAuth.getInstance() }
                 var currentUser by remember { mutableStateOf(auth.currentUser) }
+
+                // Ecouteur de l'état d'authentification
+                DisposableEffect(auth) {
+                    val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+                        currentUser = firebaseAuth.currentUser
+                    }
+                    auth.addAuthStateListener(listener)
+                    onDispose {
+                        auth.removeAuthStateListener(listener)
+                    }
+                }
 
                 if (currentUser == null) {
                     AuthScreen(onAuthSuccess = {
-                        currentUser = auth.currentUser
+                        // Pas besoin de mettre à jour currentUser ici, 
+                        // l'AuthStateListener s'en chargera.
                     })
                 } else {
                     key(currentUser?.uid) {
@@ -50,7 +62,6 @@ class MainActivity : ComponentActivity() {
                             user = currentUser!!,
                             onLogout = {
                                 auth.signOut()
-                                currentUser = null
                             }
                         )
                     }
