@@ -116,11 +116,11 @@ fun DetailsSheetContent(
                     .collection("liked_posts").document(post.id).get().await()
                 isFavorite = likedPostDoc.exists()
                 val likedAt = likedPostDoc.getTimestamp("createdAt")?.toDate()?.time ?: 0L
-                
+
                 // Update local cache
                 val dbLocal = TravelWowDatabase.getDatabase(context)
                 val existsInLocal = dbLocal.favoritePostDao().isFavorite(post.id)
-                
+
                 if (isFavorite && !existsInLocal) {
                     dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, likedAt))
                 } else if (!isFavorite && existsInLocal) {
@@ -334,642 +334,630 @@ fun DetailsSheetContent(
         )
     }
 
-    if (post == null) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(300.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-            IconButton(
-                onClick = onDismissRequest,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (post == null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(300.dp), contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Fermer",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+                CircularProgressIndicator()
             }
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            // Internal Scaffold for the content (to have the bottomBar comment input)
-            Scaffold(
-                modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.surface,
-                bottomBar = {
-                    // Quick Comment Input
-                    Surface(
-                        tonalElevation = 2.dp,
-                        shadowElevation = 8.dp,
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .navigationBarsPadding()
-                                .imePadding(),
-                            verticalAlignment = Alignment.CenterVertically
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                // Internal Scaffold for the content (to have the bottomBar comment input)
+                Scaffold(
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    bottomBar = {
+                        // Quick Comment Input
+                        Surface(
+                            tonalElevation = 2.dp,
+                            shadowElevation = 8.dp,
+                            color = MaterialTheme.colorScheme.surface
                         ) {
-                            OutlinedTextField(
-                                value = newCommentText,
-                                onValueChange = { newCommentText = it },
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
-                                            coroutineScope.launch {
-                                                sheetState.expand()
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .navigationBarsPadding()
+                                    .imePadding(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = newCommentText,
+                                    onValueChange = { newCommentText = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .onFocusChanged { focusState ->
+                                            if (focusState.isFocused) {
+                                                coroutineScope.launch {
+                                                    sheetState.expand()
+                                                }
                                             }
-                                        }
+                                        },
+                                    placeholder = {
+                                        Text(
+                                            "Ajouter un commentaire...",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
                                     },
-                                placeholder = {
-                                    Text(
-                                        "Ajouter un commentaire...",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                },
-                                maxLines = 3,
-                                shape = RoundedCornerShape(24.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                        alpha = 0.3f
-                                    ),
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                        alpha = 0.3f
+                                    maxLines = 3,
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                            alpha = 0.3f
+                                        ),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                            alpha = 0.3f
+                                        )
                                     )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
-                                onClick = {
-                                    if (newCommentText.isNotBlank() && currentUser != null) {
-                                        isSending = true
-                                        val commentData = hashMapOf(
-                                            "authorId" to currentUser.uid,
-                                            "text" to newCommentText,
-                                            "likesCount" to 0,
-                                            "createdAt" to FieldValue.serverTimestamp()
-                                        )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = {
+                                        if (newCommentText.isNotBlank() && currentUser != null) {
+                                            isSending = true
+                                            val commentData = hashMapOf(
+                                                "authorId" to currentUser.uid,
+                                                "text" to newCommentText,
+                                                "likesCount" to 0,
+                                                "createdAt" to FieldValue.serverTimestamp()
+                                            )
 
-                                        db.collection("travelpath_posts").document(post.id)
-                                            .collection("comments")
-                                            .add(commentData)
-                                            .addOnSuccessListener {
-                                                newCommentText = ""
-                                                isSending = false
-                                                // Update comments count in post
-                                                db.collection("travelpath_posts").document(post.id)
-                                                    .update("commentsCount", FieldValue.increment(1))
-                                                
-                                                // Send Notification to Post Author (if not self)
-                                                if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
-                                                    coroutineScope.launch {
-                                                        try {
-                                                            val authorDoc = db.collection("users").document(post.authorId).get().await()
-                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
-                                                            
-                                                            if (authorProfile?.settings?.commentsNotifications == true) {
-                                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
-                                                                val notification = FirebaseNotification(
-                                                                    recipientId = post.authorId,
-                                                                    senderId = currentUser.uid,
-                                                                    senderName = senderName,
-                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
-                                                                    type = NotificationType.COMMENT,
-                                                                    targetId = post.id,
-                                                                    title = "Nouveau commentaire !",
-                                                                    message = "$senderName a commenté votre parcours \"${post.title}\"."
-                                                                )
-                                                                db.collection("notifications").add(notification)
+                                            db.collection("travelpath_posts").document(post.id)
+                                                .collection("comments")
+                                                .add(commentData)
+                                                .addOnSuccessListener {
+                                                    newCommentText = ""
+                                                    isSending = false
+                                                    // Update comments count in post
+                                                    db.collection("travelpath_posts").document(post.id)
+                                                        .update("commentsCount", FieldValue.increment(1))
+
+                                                    // Send Notification to Post Author (if not self)
+                                                    if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
+                                                        coroutineScope.launch {
+                                                            try {
+                                                                val authorDoc = db.collection("users").document(post.authorId).get().await()
+                                                                val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+
+                                                                if (authorProfile?.settings?.commentsNotifications == true) {
+                                                                    val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                                    val notification = FirebaseNotification(
+                                                                        recipientId = post.authorId,
+                                                                        senderId = currentUser.uid,
+                                                                        senderName = senderName,
+                                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                        type = NotificationType.COMMENT,
+                                                                        targetId = post.id,
+                                                                        title = "Nouveau commentaire !",
+                                                                        message = "$senderName a commenté votre parcours \"${post.title}\"."
+                                                                    )
+                                                                    db.collection("notifications").add(notification)
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                Log.e("DetailsBottomSheet", "Error sending comment notification", e)
                                                             }
-                                                        } catch (e: Exception) {
-                                                            Log.e("DetailsBottomSheet", "Error sending comment notification", e)
                                                         }
                                                     }
                                                 }
-                                            }
-                                            .addOnFailureListener { e ->
-                                                Log.e("DetailsBottomSheet", "Error adding comment", e)
-                                                isSending = false
-                                            }
+                                                .addOnFailureListener { e ->
+                                                    Log.e("DetailsBottomSheet", "Error adding comment", e)
+                                                    isSending = false
+                                                }
+                                        }
+                                    },
+                                    enabled = newCommentText.isNotBlank() && !isSending,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (newCommentText.isNotBlank() && !isSending)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                ) {
+                                    if (isSending) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Envoyer",
+                                            tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline
+                                        )
                                     }
-                                },
-                                enabled = newCommentText.isNotBlank() && !isSending,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (newCommentText.isNotBlank() && !isSending)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                            ) {
-                                if (isSending) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Envoyer",
-                                        tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline
-                                    )
                                 }
                             }
                         }
                     }
-                }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            bottom = innerPadding.calculateBottomPadding() + 16.dp,
-                            top = 0.dp
-                        )
+                ) { innerPadding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
                     ) {
-                        item {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .clickable {
-                                            selectedUserId = post.authorId
-                                            showUserDialog = true
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            item {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clickable {
+                                                selectedUserId = post.authorId
+                                                showUserDialog = true
+                                            }
+                                            .padding(bottom = 12.dp)
+                                    ) {
+                                        if (author?.photoUrl != null) {
+                                            AsyncImage(
+                                                model = author?.photoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else if (author != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    author!!.username.take(1).uppercase(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                )
+                                            }
                                         }
-                                        .padding(bottom = 12.dp)
-                                ) {
-                                    if (author?.photoUrl != null) {
-                                        AsyncImage(
-                                            model = author?.photoUrl,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else if (author != null) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
                                             Text(
-                                                author!!.username.take(1).uppercase(),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                text = author?.username ?: "Username",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = "Créateur du parcours",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = author?.username ?: "Username",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = "Créateur du parcours",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-                                }
 
-                                Text(
-                                    text = post.title,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${post.locationName} • ${"%.1f".format(post.distanceKm)} km",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
+                                    Text(
+                                        text = post.title,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${post.locationName} • ${"%.1f".format(post.distanceKm)} km",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
 
-                                if (post.categories.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        post.categories.forEach { category ->
-                                            Surface(
-                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Text(
-                                                    text = category,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
+                                    if (post.categories.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            post.categories.forEach { category ->
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = category,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
-                                    .padding(horizontal = 16.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                            ) {
-                                if (isStepsLoading) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                                    }
-                                } else {
-                                    HorizontalPager(
-                                        state = pagerState,
-                                        modifier = Modifier.fillMaxSize(),
-                                        pageSpacing = 12.dp
-                                    ) { page ->
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(300.dp)
+                                        .padding(horizontal = 16.dp)
+                                        .clip(RoundedCornerShape(24.dp))
+                                ) {
+                                    if (isStepsLoading) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            if (allImages.isNotEmpty()) {
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(LocalContext.current)
-                                                        .data(allImages[page])
-                                                        .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
-                                                        .crossfade(true)
-                                                        .build(),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentScale = ContentScale.Crop,
-                                                    onError = { error ->
-                                                        Log.e("DetailsBottomSheet", "Error loading image at page $page (${allImages[page]}): ${error.result.throwable}")
-                                                    }
-                                                )
-                                            } else {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_map),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(48.dp),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                                )
-                                            }
+                                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
                                         }
-                                    }
-                                    
-                                    if (allImages.size > 1) {
-                                        Row(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomCenter)
-                                                .padding(bottom = 16.dp)
-                                                .background(
-                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                                                    CircleShape
-                                                )
-                                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            repeat(allImages.size) { index ->
-                                                val active = pagerState.currentPage == index
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(if (active) 10.dp else 6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(
-                                                            if (active) MaterialTheme.colorScheme.primary
-                                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                                alpha = 0.3f
-                                                            )
-                                                        )
-                                                        .align(Alignment.CenterVertically)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(24.dp))
-                        }
-
-                        item {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                if(post.description != null) {
-                                    Text(
-                                        text = "Description",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = post.description,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        lineHeight = 24.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                                    )
-                                }
-                                
-                                if (steps.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(24.dp))
-                                    Text(
-                                        text = "Étapes",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    steps.forEach { step ->
-                                        StepItemView(step)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(24.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                Spacer(modifier = Modifier.height(24.dp))
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { showCommentDialog = true }
-                                        .padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Commentaires",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "${post.commentsCount} avis",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-                        }
-
-                        items(previewComments, key = { it.id }) { comment ->
-                            var commentAuthor by remember { mutableStateOf<FirebaseUser?>(null) }
-                            LaunchedEffect(comment.authorId) {
-                                if (comment.authorId.isNotBlank()) {
-                                    try {
-                                        val snapshot = db.collection("users").document(comment.authorId).get().await()
-                                        commentAuthor = snapshot.toObject(FirebaseUser::class.java)
-                                    } catch (e: Exception) {
-                                        Log.e("DetailsBottomSheet", "Error fetching comment author", e)
-                                    }
-                                }
-                            }
-
-                            if (commentAuthor != null) {
-                                CommentItem(
-                                    comment = comment,
-                                    author = commentAuthor!!,
-                                    currentUserId = currentUser?.uid,
-                                    onLikeClick = {
-                                        if (currentUser != null) {
-                                            val commentRef = db.collection("travelpath_posts")
-                                                .document(post.id)
-                                                .collection("comments")
-                                                .document(comment.id)
-
-                                            coroutineScope.launch {
-                                                try {
-                                                    if (comment.likedByUsers.contains(currentUser.uid)) {
-                                                        commentRef.update(
-                                                            "likedByUsers",
-                                                            FieldValue.arrayRemove(currentUser.uid)
-                                                        ).await()
-                                                    } else {
-                                                        commentRef.update(
-                                                            "likedByUsers",
-                                                            FieldValue.arrayUnion(currentUser.uid)
-                                                        ).await()
-                                                    }
-                                                } catch (e: Exception) {
-                                                    Log.e(
-                                                        "DetailsBottomSheet",
-                                                        "Error liking comment",
-                                                        e
+                                    } else {
+                                        HorizontalPager(
+                                            state = pagerState,
+                                            modifier = Modifier.fillMaxSize(),
+                                            pageSpacing = 12.dp
+                                        ) { page ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (allImages.isNotEmpty()) {
+                                                    AsyncImage(
+                                                        model = ImageRequest.Builder(LocalContext.current)
+                                                            .data(allImages[page])
+                                                            .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                                            .crossfade(true)
+                                                            .build(),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop,
+                                                        onError = { error ->
+                                                            Log.e("DetailsBottomSheet", "Error loading image at page $page (${allImages[page]}): ${error.result.throwable}")
+                                                        }
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.ic_map),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(48.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                                     )
                                                 }
                                             }
                                         }
-                                    },
-                                    onAuthorClick = {
-                                        Log.d(
-                                            "DetailsBottomSheet",
-                                            "Author clicked: ${commentAuthor!!.username} (ID: ${comment.authorId})"
-                                        )
-                                        selectedUserId = comment.authorId
-                                        showUserDialog = true
-                                    },
-                                    onReportClick = {
-                                        reportTargetId = comment.id
-                                        reportTargetType = "comment"
-                                        showReportDialog = true
-                                    }
-                                )
-                            }
-                        }
-                    }
 
-                    // Floating Close Button at Top-Left
-                    IconButton(
-                        onClick = onDismissRequest,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(16.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                                CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Fermer",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    val isAuthor = currentUser?.uid == post.authorId
-
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                isExporting = true
-                                coroutineScope.launch {
-                                    val file = PdfExporter.exportPostToPdf(context, post, author!!, steps)
-                                    isExporting = false
-                                    if (file != null) {
-                                        val uri = FileProvider.getUriForFile(
-                                            context,
-                                            "${context.packageName}.provider",
-                                            file
-                                        )
-                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            setDataAndType(uri, "application/pdf")
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(Intent.createChooser(intent, "Ouvrir le PDF"))
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        ) {
-                            if (isExporting) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_download),
-                                    contentDescription = "Exporter en PDF",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-
-                        IconButton(
-                            onClick = { showShareDialog = true },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Partager",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        if (isAuthor) {
-                            IconButton(
-                                onClick = { showDeleteDialog = true },
-                                modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Supprimer",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                        else {
-                            IconButton(
-                                onClick = {
-                                    if (currentUser != null) {
-                                        val userRef = db.collection("users").document(currentUser.uid)
-                                        val postRef = db.collection("travelpath_posts").document(post.id)
-                                        val likedPostRef = userRef.collection("liked_posts").document(post.id)
-                                        val dbLocal = TravelWowDatabase.getDatabase(context)
-                                        
-                                        coroutineScope.launch {
-                                            try {
-                                                if (isFavorite) {
-                                                    // Unlike
-                                                    likedPostRef.delete().await()
-                                                    postRef.update("likesCount", FieldValue.increment(-1)).await()
-                                                    dbLocal.favoritePostDao().deleteByPostId(post.id)
-                                                    isFavorite = false
-                                                } else {
-                                                    // Like
-                                                    val now = System.currentTimeMillis()
-                                                    likedPostRef.set(FirebaseLikedPost(id = post.id)).await()
-                                                    postRef.update("likesCount", FieldValue.increment(1)).await()
-                                                    dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, now))
-                                                    isFavorite = true
-
-                                                    // Send Notification to Post Author (if not self)
-                                                    if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
-                                                        try {
-                                                            val authorDoc = db.collection("users").document(post.authorId).get().await()
-                                                            val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
-                                                            
-                                                            if (authorProfile?.settings?.likesNotifications == true) {
-                                                                val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
-                                                                val notification = FirebaseNotification(
-                                                                    recipientId = post.authorId,
-                                                                    senderId = currentUser.uid,
-                                                                    senderName = senderName,
-                                                                    senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
-                                                                    type = NotificationType.LIKE,
-                                                                    targetId = post.id,
-                                                                    title = "Nouveau like !",
-                                                                    message = "$senderName a aimé votre parcours \"${post.title}\"."
+                                        if (allImages.size > 1) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .padding(bottom = 16.dp)
+                                                    .background(
+                                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                                        CircleShape
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                repeat(allImages.size) { index ->
+                                                    val active = pagerState.currentPage == index
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(if (active) 10.dp else 6.dp)
+                                                            .clip(CircleShape)
+                                                            .background(
+                                                                if (active) MaterialTheme.colorScheme.primary
+                                                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                                    alpha = 0.3f
                                                                 )
-                                                                db.collection("notifications").add(notification)
-                                                            }
-                                                        } catch (e: Exception) {
-                                                            Log.e("DetailsBottomSheet", "Error sending like notification", e)
-                                                        }
-                                                    }
+                                                            )
+                                                            .align(Alignment.CenterVertically)
+                                                    )
                                                 }
-                                            } catch (e: Exception) {
-                                                Log.e("DetailsBottomSheet", "Error updating liked posts", e)
                                             }
                                         }
                                     }
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
+                            }
+
+                            item {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    if(post.description != null) {
+                                        Text(
+                                            text = "Description",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = post.description,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            lineHeight = 24.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                        )
+                                    }
+
+                                    if (steps.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(24.dp))
+                                        Text(
+                                            text = "Étapes",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        steps.forEach { step ->
+                                            StepItemView(step)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    Spacer(modifier = Modifier.height(24.dp))
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { showCommentDialog = true }
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Commentaires",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${post.commentsCount} avis",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
+
+                            items(previewComments, key = { it.id }) { comment ->
+                                var commentAuthor by remember { mutableStateOf<FirebaseUser?>(null) }
+                                LaunchedEffect(comment.authorId) {
+                                    if (comment.authorId.isNotBlank()) {
+                                        try {
+                                            val snapshot = db.collection("users").document(comment.authorId).get().await()
+                                            commentAuthor = snapshot.toObject(FirebaseUser::class.java)
+                                        } catch (e: Exception) {
+                                            Log.e("DetailsBottomSheet", "Error fetching comment author", e)
+                                        }
+                                    }
+                                }
+
+                                if (commentAuthor != null) {
+                                    CommentItem(
+                                        comment = comment,
+                                        author = commentAuthor!!,
+                                        currentUserId = currentUser?.uid,
+                                        onLikeClick = {
+                                            if (currentUser != null) {
+                                                val commentRef = db.collection("travelpath_posts")
+                                                    .document(post.id)
+                                                    .collection("comments")
+                                                    .document(comment.id)
+
+                                                coroutineScope.launch {
+                                                    try {
+                                                        if (comment.likedByUsers.contains(currentUser.uid)) {
+                                                            commentRef.update(
+                                                                "likedByUsers",
+                                                                FieldValue.arrayRemove(currentUser.uid)
+                                                            ).await()
+                                                        } else {
+                                                            commentRef.update(
+                                                                "likedByUsers",
+                                                                FieldValue.arrayUnion(currentUser.uid)
+                                                            ).await()
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Log.e(
+                                                            "DetailsBottomSheet",
+                                                            "Error liking comment",
+                                                            e
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onAuthorClick = {
+                                            Log.d(
+                                                "DetailsBottomSheet",
+                                                "Author clicked: ${commentAuthor!!.username} (ID: ${comment.authorId})"
+                                            )
+                                            selectedUserId = comment.authorId
+                                            showUserDialog = true
+                                        },
+                                        onReportClick = {
+                                            reportTargetId = comment.id
+                                            reportTargetType = "comment"
+                                            showReportDialog = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        val isAuthor = currentUser?.uid == post.authorId
+
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    isExporting = true
+                                    coroutineScope.launch {
+                                        val file = PdfExporter.exportPostToPdf(context, post, author!!, steps)
+                                        isExporting = false
+                                        if (file != null) {
+                                            val uri = FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.provider",
+                                                file
+                                            )
+                                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(uri, "application/pdf")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(intent, "Ouvrir le PDF"))
+                                        }
+                                    }
                                 },
                                 modifier = Modifier
                                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
                             ) {
-                                Icon(
-                                    painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite),
-                                    contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                                    tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurface
-                                )
+                                if (isExporting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_download),
+                                        contentDescription = "Exporter en PDF",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
 
                             IconButton(
-                                onClick = { 
-                                    reportTargetId = post.id
-                                    reportTargetType = "post"
-                                    showReportDialog = true 
-                                },
+                                onClick = { showShareDialog = true },
                                 modifier = Modifier
                                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
                             ) {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_warning),
-                                    contentDescription = "Signaler",
-                                    tint = MaterialTheme.colorScheme.error
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Partager",
+                                    tint = MaterialTheme.colorScheme.onSurface
                                 )
+                            }
+
+                            if (isAuthor) {
+                                IconButton(
+                                    onClick = { showDeleteDialog = true },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Supprimer",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            else {
+                                IconButton(
+                                    onClick = {
+                                        if (currentUser != null) {
+                                            val userRef = db.collection("users").document(currentUser.uid)
+                                            val postRef = db.collection("travelpath_posts").document(post.id)
+                                            val likedPostRef = userRef.collection("liked_posts").document(post.id)
+                                            val dbLocal = TravelWowDatabase.getDatabase(context)
+
+                                            coroutineScope.launch {
+                                                try {
+                                                    if (isFavorite) {
+                                                        // Unlike
+                                                        likedPostRef.delete().await()
+                                                        postRef.update("likesCount", FieldValue.increment(-1)).await()
+                                                        dbLocal.favoritePostDao().deleteByPostId(post.id)
+                                                        isFavorite = false
+                                                    } else {
+                                                        // Like
+                                                        val now = System.currentTimeMillis()
+                                                        likedPostRef.set(FirebaseLikedPost(id = post.id)).await()
+                                                        postRef.update("likesCount", FieldValue.increment(1)).await()
+                                                        dbLocal.favoritePostDao().insertFavorite(FavoritePost.fromFirebasePost(post, now))
+                                                        isFavorite = true
+
+                                                        // Send Notification to Post Author (if not self)
+                                                        if (post.authorId.isNotBlank() && post.authorId != currentUser.uid) {
+                                                            try {
+                                                                val authorDoc = db.collection("users").document(post.authorId).get().await()
+                                                                val authorProfile = authorDoc.toObject(FirebaseUser::class.java)
+
+                                                                if (authorProfile?.settings?.likesNotifications == true) {
+                                                                    val senderName = currentUserProfile?.username ?: currentUser.displayName ?: "Un voyageur"
+                                                                    val notification = FirebaseNotification(
+                                                                        recipientId = post.authorId,
+                                                                        senderId = currentUser.uid,
+                                                                        senderName = senderName,
+                                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                        type = NotificationType.LIKE,
+                                                                        targetId = post.id,
+                                                                        title = "Nouveau like !",
+                                                                        message = "$senderName a aimé votre parcours \"${post.title}\"."
+                                                                    )
+                                                                    db.collection("notifications").add(notification)
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                Log.e("DetailsBottomSheet", "Error sending like notification", e)
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("DetailsBottomSheet", "Error updating liked posts", e)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite),
+                                        contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                                        tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        reportTargetId = post.id
+                                        reportTargetType = "post"
+                                        showReportDialog = true
+                                    },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_warning),
+                                        contentDescription = "Signaler",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+
+        // Floating Close Button at Top-Left (Unified and always on top)
+        IconButton(
+            onClick = onDismissRequest,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Fermer",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -1107,7 +1095,7 @@ fun CommentItem(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onAuthorClick() }
                 )
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val date = comment.createdAt.toDate()
                     val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())

@@ -65,9 +65,8 @@ fun ParcoursScreen(
 
     var selectedPost by remember { mutableStateOf<FirebasePost?>(null) }
     var focusedPostForMap by remember { mutableStateOf<FirebasePost?>(null) }
-    var showBottomSheet by remember { mutableStateOf(false) }
     var galleryViewMode by rememberSaveable { mutableStateOf(GalleryViewMode.GRID) }
-    
+
     var postFilter by remember { mutableStateOf(PostFilter()) }
     var showFilterSheet by remember { mutableStateOf(false) }
 
@@ -84,33 +83,24 @@ fun ParcoursScreen(
         skipHiddenState = false
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
-    
+
     val closeBottomSheet = {
         coroutineScope.launch {
-            try { sheetState.hide() } catch (e: Exception) {}
-            showBottomSheet = false
+            try {
+                sheetState.hide()
+            } catch (e: Exception) {
+                Log.e("ParcoursScreen", "Error hiding bottom sheet", e)
+            }
             selectedPost = null
             focusedPostForMap = null
         }
         Unit
     }
 
-    // Sync showBottomSheet with sheetState
-    LaunchedEffect(sheetState.currentValue) {
-        if (sheetState.currentValue == SheetValue.Hidden) {
-            showBottomSheet = false
-            selectedPost = null
-            focusedPostForMap = null
-        } else {
-            showBottomSheet = true
-        }
-    }
-
-
-    BackHandler(enabled = showBottomSheet || showCreatePost || showAddStep) {
+    BackHandler(enabled = sheetState.currentValue != SheetValue.Hidden || showCreatePost || showAddStep) {
         if (showAddStep) showAddStep = false
         else if (showCreatePost) showCreatePost = false
-        else if (showBottomSheet) closeBottomSheet()
+        else if (sheetState.currentValue != SheetValue.Hidden) closeBottomSheet()
     }
 
     // State for AddStepScreen
@@ -121,9 +111,9 @@ fun ParcoursScreen(
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = if (showBottomSheet) 140.dp else 0.dp,
-        sheetDragHandle = { if (showBottomSheet) BottomSheetDefaults.DragHandle() },
-        sheetSwipeEnabled = showBottomSheet,
+        sheetPeekHeight = if (sheetState.currentValue == SheetValue.Hidden) 0.dp else 140.dp,
+        sheetDragHandle = { if (sheetState.currentValue != SheetValue.Hidden) BottomSheetDefaults.DragHandle() },
+        sheetSwipeEnabled = true,
         sheetContent = {
             DetailsSheetContent(
                 post = selectedPost,
@@ -212,7 +202,17 @@ fun ParcoursScreen(
                                     steps = firebaseSteps,
                                     categories = firebaseSteps.map { it.category }.filter { it.isNotBlank() }.distinct()
                                 )
-                                postRef.set(post).await()
+
+                                val batch = db.batch()
+                                batch.set(postRef, post)
+
+                                val stepsCollection = postRef.collection("steps")
+                                firebaseSteps.forEach { step ->
+                                    batch.set(stepsCollection.document(step.id), step)
+                                }
+
+                                batch.commit().await()
+
                                 showPostSuccessDialog = true
                                 showCreatePost = false
                                 postTitle = ""; postDescription = ""; postSteps = emptyList()
@@ -225,7 +225,7 @@ fun ParcoursScreen(
                     },
                     viewMode = galleryViewMode,
                     onViewModeChange = { galleryViewMode = it },
-                    isPostSelected = showBottomSheet,
+                    isPostSelected = sheetState.currentValue != SheetValue.Hidden,
                     onDeselect = closeBottomSheet,
                     onResetPost = { showCreatePost = false; postTitle = ""; postSteps = emptyList() },
                     onBackToShare = onBackToShare,
@@ -238,7 +238,7 @@ fun ParcoursScreen(
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
             // Content
             Box {
                 if (showAddStep) {
@@ -262,35 +262,43 @@ fun ParcoursScreen(
                     )
                 } else if (isFavoriteTab) {
                     PostsGallery(
-                        onPostClick = { post -> 
-                    selectedPost = post
-                    focusedPostForMap = post
-                    coroutineScope.launch {
-                        sheetState.partialExpand()
-                    }
-                },
+                        onPostClick = { post ->
+                            selectedPost = post
+                            focusedPostForMap = post
+                            coroutineScope.launch {
+                                if (galleryViewMode == GalleryViewMode.GRID) {
+                                    sheetState.expand()
+                                } else {
+                                    sheetState.partialExpand()
+                                }
+                            }
+                        },
                         viewMode = galleryViewMode, favoritesUserId = user.uid,
                         focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
-                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                        contentPadding = PaddingValues(bottom = innerPadding.calculateBottomPadding()),
                         onEmptySpaceClick = closeBottomSheet
                     )
                 } else {
                     SearchScreen(
-                        onPostClick = { post -> 
-                    selectedPost = post
-                    focusedPostForMap = post
-                    coroutineScope.launch {
-                        sheetState.partialExpand()
-                    }
-                },
-                        viewMode = galleryViewMode, 
+                        onPostClick = { post ->
+                            selectedPost = post
+                            focusedPostForMap = post
+                            coroutineScope.launch {
+                                if (galleryViewMode == GalleryViewMode.GRID) {
+                                    sheetState.expand()
+                                } else {
+                                    sheetState.partialExpand()
+                                }
+                            }
+                        },
+                        viewMode = galleryViewMode,
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         filter = postFilter,
                         onFilterChange = { postFilter = it }, showFilterSheet = showFilterSheet,
                         onShowFilterSheetChange = { showFilterSheet = it },
                         focusedPost = focusedPostForMap, onFocusedPostChange = { focusedPostForMap = it; if (it == null) closeBottomSheet() },
-                        contentPadding = PaddingValues(bottom = if (showBottomSheet) 140.dp else 0.dp),
+                        contentPadding = PaddingValues(bottom = innerPadding.calculateBottomPadding()),
                         onEmptySpaceClick = closeBottomSheet
                     )
                 }

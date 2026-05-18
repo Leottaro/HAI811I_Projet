@@ -73,7 +73,7 @@ fun TravelWowApp(
     var appMode by remember { mutableStateOf(AppMode.SHARE) }
     var currentDestination by remember { mutableStateOf<MainDestination>(MainDestination.Feed) }
     var subScreen by remember { mutableStateOf<SubScreen>(SubScreen.None) }
-    
+
     val isAnonymous = user.isAnonymous
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -98,7 +98,7 @@ fun TravelWowApp(
         navigationSuiteItems = {
             MainDestination.values().forEach { dest ->
                 val isRestricted = isAnonymous && (dest == MainDestination.Messages || dest == MainDestination.Social || dest == MainDestination.Profile)
-                
+
                 item(
                     icon = {
                         CompositionLocalProvider(
@@ -107,17 +107,17 @@ fun TravelWowApp(
                             dest.icon()
                         }
                     },
-                    label = { 
+                    label = {
                         Text(
                             text = dest.label,
                             color = if (isRestricted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
-                        ) 
+                        )
                     },
                     selected = currentDestination == dest,
                     onClick = { 
                         if (!isRestricted) {
                             currentDestination = dest
-                            subScreen = SubScreen.None 
+                            subScreen = SubScreen.None
                         }
                     }
                 )
@@ -180,7 +180,7 @@ fun TravelWowApp(
                         skipHiddenState = false
                     )
                     val scope = rememberCoroutineScope()
-                    
+
                     // Sync subScreen with sheetState
                     LaunchedEffect(sheetState.currentValue) {
                         if (sheetState.currentValue == SheetValue.Hidden) {
@@ -190,7 +190,7 @@ fun TravelWowApp(
 
                     DetailsSheetContent(
                         post = (subScreen as SubScreen.PostDetail).post,
-                        onDismissRequest = { 
+                        onDismissRequest = {
                             scope.launch {
                                 sheetState.hide()
                                 subScreen = SubScreen.None
@@ -200,9 +200,9 @@ fun TravelWowApp(
                     )
                 }
                 SubScreen.None -> {
-                    val isPathEligible = currentDestination == MainDestination.Feed || 
+                    val isPathEligible = currentDestination == MainDestination.Feed ||
                                        currentDestination == MainDestination.Favorites
-                    
+
                     if (appMode == AppMode.PATH && isPathEligible) {
                         ParcoursScreen(
                             user = user,

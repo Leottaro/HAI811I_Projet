@@ -62,7 +62,7 @@ fun TravelWowApp(
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showEditProfile by rememberSaveable { mutableStateOf(false) }
-    
+
     var userProfile by remember { mutableStateOf<FirebaseUser?>(null) }
     var userPostCount by remember { mutableStateOf(0) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -98,7 +98,7 @@ fun TravelWowApp(
                     userProfile = snapshot.toObject(FirebaseUser::class.java)
                 } else if (userProfile == null && user.email != null) {
                     // Initialize profile if it doesn't exist (one-time)
-                    val initialUsername = user.displayName?.takeIf { it.isNotBlank() } 
+                    val initialUsername = user.displayName?.takeIf { it.isNotBlank() }
                         ?: user.email!!.substringBefore("@")
                     val initialProfile = FirebaseUser(
                         id = user.uid,
@@ -209,36 +209,23 @@ fun TravelWowApp(
     var currentStepLocation by remember { mutableStateOf(LatLng(43.6107, 3.8767)) }
     
     val sheetState = rememberStandardBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        skipHiddenState = false
+        initialValue = SheetValue.PartiallyExpanded
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
     
     val closeBottomSheet = {
+        showBottomSheet = false
         coroutineScope.launch {
             try {
-                sheetState.hide()
+                sheetState.partialExpand()
             } catch (e: Exception) {
                 Log.e("TravelWowApp", "Error closing bottom sheet", e)
             }
-            showBottomSheet = false
             selectedPost = null
             focusedPostForMap = null
         }
         Unit
     }
-
-    // Sync showBottomSheet with sheetState
-    LaunchedEffect(sheetState.currentValue) {
-        if (sheetState.currentValue == SheetValue.Hidden) {
-            showBottomSheet = false
-            selectedPost = null
-            focusedPostForMap = null
-        } else {
-            showBottomSheet = true
-        }
-    }
-
 
     // Automatically deselect the post when the page changes
     LaunchedEffect(currentDestination) {
@@ -533,17 +520,17 @@ fun TravelWowApp(
                                     "username" to newName,
                                     "bio" to newBio
                                 )
-                                finalPhotoUrl?.let { 
-                                    updates["photoUrl"] = it 
+                                finalPhotoUrl?.let {
+                                    updates["photoUrl"] = it
                                     updates["profileImageUrl"] = it // Synchro travelShare
                                 }
-                                
+
                                 db.collection("users").document(user.uid)
                                     .set(updates, SetOptions.merge())
                                     .await()
-                                
+
                                 Log.d("TravelWowApp", "Firestore profile updated")
-                                
+
                                 userProfile = userProfile?.copy(
                                     username = newName,
                                     bio = newBio,
@@ -563,7 +550,7 @@ fun TravelWowApp(
                     settings = userProfile?.settings ?: FirebaseUserSettings(),
                     userEmail = user.email ?: "Utilisateur",
                     onBack = { showSettings = false },
-                    onLogout = { 
+                    onLogout = {
                         showSettings = false
                         coroutineScope.launch {
                             TravelWowDatabase.getDatabase(context).favoritePostDao().clearAll()
@@ -586,7 +573,7 @@ fun TravelWowApp(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                Column(modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
                     Box(modifier = Modifier.weight(1f)) {
                         when (currentDestination) {
                                 AppDestinations.HOME -> {
@@ -685,7 +672,11 @@ fun TravelWowApp(
                                                 selectedPost = post
                                                 focusedPostForMap = post
                                                 coroutineScope.launch {
-                                                    sheetState.partialExpand()
+                                                    if (galleryViewMode == GalleryViewMode.GRID) {
+                                                        sheetState.expand()
+                                                    } else {
+                                                        sheetState.partialExpand()
+                                                    }
                                                 }
                                             },
                                             viewMode = galleryViewMode,
@@ -714,7 +705,11 @@ fun TravelWowApp(
                                             selectedPost = post
                                             focusedPostForMap = post
                                             coroutineScope.launch {
-                                                sheetState.partialExpand()
+                                                if (galleryViewMode == GalleryViewMode.GRID) {
+                                                    sheetState.expand()
+                                                } else {
+                                                    sheetState.partialExpand()
+                                                }
                                             }
                                         },
                                         viewMode = galleryViewMode,
@@ -770,7 +765,11 @@ fun TravelWowApp(
                                                     selectedPost = post
                                                     focusedPostForMap = post
                                                     coroutineScope.launch {
-                                                        sheetState.partialExpand()
+                                                        if (galleryViewMode == GalleryViewMode.GRID) {
+                                                            sheetState.expand()
+                                                        } else {
+                                                            sheetState.partialExpand()
+                                                        }
                                                     }
                                                 },
                                                 viewMode = galleryViewMode,
