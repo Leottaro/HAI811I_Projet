@@ -113,11 +113,7 @@ class ProfileViewModel(
                 override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
                     val imageUrl = resultData?.get("secure_url") as String
                     viewModelScope.launch {
-                        // On met à jour les deux champs pour la synchro travelShare/travelPath
-                        userRepository.updateProfile(uid, mapOf(
-                            "profileImageUrl" to imageUrl,
-                            "photoUrl" to imageUrl
-                        ))
+                        userRepository.updateProfile(uid, mapOf("profileImageUrl" to imageUrl))
                         _profile.value = userRepository.getUserProfile(uid)
                         _isLoading.value = false
                         onComplete(Result.success(Unit))

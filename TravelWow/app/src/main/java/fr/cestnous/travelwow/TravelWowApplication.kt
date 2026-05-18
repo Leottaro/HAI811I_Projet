@@ -16,8 +16,6 @@ class TravelWowApplication : Application() {
         FirebaseApp.initializeApp(this)
 
         // Initialisation App Check (depuis travelPath)
-        // Commenté car renvoie une erreur 403 (API non activée) qui peut bloquer les requêtes
-        /*
         try {
             Firebase.appCheck.installAppCheckProviderFactory(
                 DebugAppCheckProviderFactory.getInstance()
@@ -26,7 +24,6 @@ class TravelWowApplication : Application() {
         } catch (e: Exception) {
             Log.e("TravelWowApp", "App Check initialization failed", e)
         }
-        */
 
         // Initialisation OpenStreetMap (depuis travelShare)
         try {

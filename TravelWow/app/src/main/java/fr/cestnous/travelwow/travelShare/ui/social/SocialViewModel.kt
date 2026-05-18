@@ -96,20 +96,45 @@ class SocialViewModel(
 
     fun sendRequest(toUser: UserProfile) {
         viewModelScope.launch {
-            val currentUid = auth.currentUser?.uid ?: return@launch
-            val fromUser = userRepository.getUserProfile(currentUid) ?: return@launch
-            friendRepository.sendFriendRequest(fromUser, toUser.uid)
+            try {
+                val currentUid = auth.currentUser?.uid ?: return@launch
+                val fromUser = userRepository.getUserProfile(currentUid) ?: return@launch
+                
+                if (fromUser.uid.isBlank()) {
+                    android.util.Log.e("SocialViewModel", "Sender UID is blank, checking auth UID")
+                }
+
+                val result = friendRepository.sendFriendRequest(fromUser, toUser.uid)
+                if (result.isSuccess) {
+                    loadDiscoverUsers()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialViewModel", "Error sending request", e)
+            }
         }
     }
 
     fun acceptRequest(request: FriendRequest) {
         viewModelScope.launch {
-            val currentUid = auth.currentUser?.uid ?: return@launch
-            val myProfile = userRepository.getUserProfile(currentUid)
-            val myUsername = myProfile?.username ?: auth.currentUser?.email ?: "Anonyme"
-            
-            friendRepository.acceptFriendRequest(request.id, currentUid, request.fromId, myUsername)
-            loadFriends(currentUid)
+            try {
+                val currentUid = auth.currentUser?.uid ?: return@launch
+                val myProfile = userRepository.getUserProfile(currentUid)
+                val myUsername = myProfile?.username ?: auth.currentUser?.email ?: "Anonyme"
+                
+                if (request.id.isBlank()) {
+                    android.util.Log.e("SocialViewModel", "Request ID is blank!")
+                }
+
+                val result = friendRepository.acceptFriendRequest(request.id, currentUid, request.fromId, myUsername)
+                if (result.isSuccess) {
+                    loadFriends(currentUid)
+                    observeIncomingRequests(currentUid)
+                } else {
+                    android.util.Log.e("SocialViewModel", "Failed to accept: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialViewModel", "Error accepting request", e)
+            }
         }
     }
 }

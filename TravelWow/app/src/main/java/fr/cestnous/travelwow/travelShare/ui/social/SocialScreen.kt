@@ -1,15 +1,18 @@
 package fr.cestnous.travelwow.travelShare.ui.social
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -101,17 +104,31 @@ fun RequestsTab(viewModel: SocialViewModel) {
             Text("Aucune demande en attente.")
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(requests) { request ->
-                // Basic representation for request
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(request.fromUsername, modifier = Modifier.weight(1f))
-                        Button(onClick = { viewModel.acceptRequest(request) }) {
+                ListItem(
+                    headlineContent = { Text(request.fromUsername, fontWeight = FontWeight.Bold) },
+                    supportingContent = { Text("Souhaite devenir votre ami") },
+                    leadingContent = {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(request.fromUsername.take(1).uppercase())
+                        }
+                    },
+                    trailingContent = {
+                        Button(
+                            onClick = { viewModel.acceptRequest(request) },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
                             Text("Accepter")
                         }
                     }
-                }
+                )
             }
         }
     }
