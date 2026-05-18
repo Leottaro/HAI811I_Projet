@@ -430,7 +430,7 @@ fun DetailsSheetContent(
                                                                         recipientId = post.authorId,
                                                                         senderId = currentUser.uid,
                                                                         senderName = senderName,
-                                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                        senderPhotoUrl = currentUserProfile?.profileImageUrl,
                                                                         type = NotificationType.COMMENT,
                                                                         targetId = post.id,
                                                                         title = "Nouveau commentaire !",
@@ -499,12 +499,17 @@ fun DetailsSheetContent(
                                             }
                                             .padding(bottom = 12.dp)
                                     ) {
-                                        if (author?.photoUrl != null) {
+                                        val authorprofileImageUrl = author?.profileImageUrl ?: author?.profileImageUrl
+                                        if (authorprofileImageUrl != null) {
                                             AsyncImage(
-                                                model = author?.photoUrl,
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(authorprofileImageUrl)
+                                                    .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                                                    .crossfade(true)
+                                                    .build(),
                                                 contentDescription = null,
                                                 modifier = Modifier
-                                                    .size(32.dp)
+                                                    .size(40.dp)
                                                     .clip(CircleShape)
                                                     .background(MaterialTheme.colorScheme.secondaryContainer),
                                                 contentScale = ContentScale.Crop
@@ -512,29 +517,30 @@ fun DetailsSheetContent(
                                         } else if (author != null) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(32.dp)
+                                                    .size(40.dp)
                                                     .clip(CircleShape)
                                                     .background(MaterialTheme.colorScheme.secondaryContainer),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     author!!.username.take(1).uppercase(),
-                                                    style = MaterialTheme.typography.labelMedium,
+                                                    style = MaterialTheme.typography.titleMedium,
                                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                                 )
                                             }
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
                                         Column {
                                             Text(
-                                                text = author?.username ?: "Username",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary
+                                                text = author?.username ?: "Utilisateur",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
                                                 text = "Créateur du parcours",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.outline
+                                                color = MaterialTheme.colorScheme.primary
                                             )
                                         }
                                     }
@@ -891,7 +897,7 @@ fun DetailsSheetContent(
                                                                         recipientId = post.authorId,
                                                                         senderId = currentUser.uid,
                                                                         senderName = senderName,
-                                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                                        senderPhotoUrl = currentUserProfile?.profileImageUrl,
                                                                         type = NotificationType.LIKE,
                                                                         targetId = post.id,
                                                                         title = "Nouveau like !",
@@ -1049,15 +1055,20 @@ fun CommentItem(
     val isLiked = currentUserId != null && comment.likedByUsers.contains(currentUserId)
     val likesCount = comment.likedByUsers.size
 
+    val effectiveprofileImageUrl = author.profileImageUrl ?: author.profileImageUrl
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        if (author.photoUrl != null) {
+        if (effectiveprofileImageUrl != null) {
             AsyncImage(
-                model = author.photoUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(effectiveprofileImageUrl)
+                    .setHeader("User-Agent", "TravelWowApp/1.0 (https://github.com/leo/TravelWow; travelwow-app@example.com)")
+                    .crossfade(true)
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier
                     .size(40.dp)

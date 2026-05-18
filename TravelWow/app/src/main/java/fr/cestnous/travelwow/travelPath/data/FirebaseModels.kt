@@ -13,7 +13,6 @@ data class FirebaseUser(
     val username: String = "",
     val email: String = "",
     val bio: String = "",
-    val photoUrl: String? = null,
     val profileImageUrl: String? = null, // Sync with travelShare
     val fcmToken: String? = null,
     val followersCount: Int = 0,

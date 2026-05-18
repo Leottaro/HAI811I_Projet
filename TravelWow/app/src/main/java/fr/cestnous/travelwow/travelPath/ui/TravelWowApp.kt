@@ -417,7 +417,7 @@ fun TravelWowApp(
                                                                     recipientId = profileDoc.id,
                                                                     senderId = user.uid,
                                                                     senderName = senderName,
-                                                                    senderPhotoUrl = userProfile?.photoUrl,
+                                                                    senderPhotoUrl = userProfile?.profileImageUrl,
                                                                     type = NotificationType.NEW_POST,
                                                                     targetId = postId,
                                                                     title = "Nouveau parcours !",
@@ -502,7 +502,7 @@ fun TravelWowApp(
                     userId = user.uid,
                     currentUsername = userProfile?.username ?: "Utilisateur inconnu",
                     currentBio = userProfile?.bio ?: "",
-                    currentPhotoUri = userProfile?.photoUrl,
+                    currentPhotoUri = userProfile?.profileImageUrl,
                     onBack = { showEditProfile = false },
                     onSave = { newName, newBio, newPhotoUri ->
                         coroutineScope.launch {
@@ -534,7 +534,7 @@ fun TravelWowApp(
                                 userProfile = userProfile?.copy(
                                     username = newName,
                                     bio = newBio,
-                                    photoUrl = finalPhotoUrl
+                                    profileImageUrl = finalPhotoUrl
                                 )
                                 showEditProfile = false
                             } catch (e: Exception) {
@@ -731,7 +731,7 @@ fun TravelWowApp(
                                         ProfileHeader(
                                             username = userProfile?.username ?: "Utilisateur inconnu",
                                             bio = userProfile?.bio ?: "",
-                                            photoUri = userProfile?.photoUrl,
+                                            photoUri = userProfile?.profileImageUrl,
                                             postsCount = userPostCount,
                                             followersCount = userProfile?.followersCount ?: 0,
                                             followingCount = userProfile?.followingCount ?: 0,

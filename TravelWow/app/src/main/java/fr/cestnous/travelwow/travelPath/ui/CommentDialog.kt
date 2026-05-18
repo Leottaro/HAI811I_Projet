@@ -221,7 +221,7 @@ fun CommentDialog(
                                                             recipientId = postAuthorId,
                                                             senderId = currentUser.uid,
                                                             senderName = senderName,
-                                                            senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                            senderPhotoUrl = currentUserProfile?.profileImageUrl,
                                                             type = NotificationType.COMMENT,
                                                             targetId = postId,
                                                             title = "Nouveau commentaire !",
@@ -278,9 +278,9 @@ fun FirebaseCommentItem(comment: FirebaseComment, author: FirebaseUser) {
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
-        if (author.photoUrl != null) {
+        if (author.profileImageUrl != null) {
             AsyncImage(
-                model = author.photoUrl,
+                model = author.profileImageUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(36.dp)

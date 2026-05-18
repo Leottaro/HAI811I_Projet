@@ -123,7 +123,7 @@ fun SharePostDialog(
                                                         recipientId = friend.uid,
                                                         senderId = currentUser.uid,
                                                         senderName = senderName,
-                                                        senderPhotoUrl = currentUserProfile?.photoUrl ?: currentUser.photoUrl?.toString(),
+                                                        senderPhotoUrl = currentUserProfile?.profileImageUrl,
                                                         type = NotificationType.SHARE_POST,
                                                         targetId = post.id,
                                                         title = "Nouveau parcours partagé !",
